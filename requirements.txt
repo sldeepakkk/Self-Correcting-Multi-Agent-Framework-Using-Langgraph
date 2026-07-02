@@ -1,0 +1,12 @@
+langgraph
+langchain-core
+langchain-groq
+langchain-google-genai
+faiss-cpu
+sentence-transformers
+tavily-python
+yfinance
+pydantic
+python-dotenv
+numpy
+matplotlib

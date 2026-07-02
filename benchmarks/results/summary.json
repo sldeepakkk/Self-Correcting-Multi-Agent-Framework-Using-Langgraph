@@ -1,0 +1,22 @@
+{
+  "total_runs": 20,
+  "path_distribution": {
+    "medium": 6,
+    "slow": 6,
+    "fast": 3,
+    "error": 5
+  },
+  "cache_hit_rate_pct": 15.0,
+  "avg_cache_hit_latency_ms": 61,
+  "avg_cache_miss_latency_ms": 24948,
+  "median_cache_hit_latency_ms": 55,
+  "median_cache_miss_latency_ms": 10789,
+  "cache_speedup_x": 409.0,
+  "crag_trigger_rate_pct": 30.0,
+  "crag_recovery_rate_pct": 100.0,
+  "framework_avg_judge_score": 8.33,
+  "plain_llm_avg_judge_score": 4.34,
+  "framework_factual_grounding": 9.5,
+  "plain_llm_factual_grounding": 5.0,
+  "framework_wins_pct": 100.0
+}
