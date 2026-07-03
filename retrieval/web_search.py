@@ -1,7 +1,9 @@
 from tavily import TavilyClient
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from utils.llm_factory import get_llm
 # from langchain_groq import ChatGroq
-from config import TAVILY_API_KEY, GROQ_API_KEY, JUDGE_MODEL
+from config import TAVILY_API_KEY, JUDGE_MODEL
 import json
 import re
 from datetime import datetime
@@ -53,43 +55,46 @@ def _build_search_query(sub_query: str) -> str:
         return f"{sub_query} NSE India stock"
 
 
+def _search_single(args):
+    sub_query, max_results = args
+    search_query = _build_search_query(sub_query)
+    category = _classify_subquery(sub_query)
+    try:
+        response = _tavily.search(
+            query=search_query,
+            max_results=max_results,
+            search_depth="advanced",
+            topic="news" if category == "macro" else "general"
+        )
+        print(f"[WEB SEARCH] [{category}] '{search_query}'")
+        return response.get("results", []), sub_query, category
+    except Exception as e:
+        print(f"[WEB SEARCH] Tavily error on '{sub_query}': {e}")
+        return [], sub_query, category
+
+
 def search_web(sub_queries: list[str], max_results_per_query: int = 5) -> list[dict]:
-    """
-    Run Tavily search on each sub-query.
-    Query construction adapts per sub-query — macro queries get a
-    recency anchor + news topic, ticker queries keep the stock-market
-    anchor + general topic.
-    """
     all_results = []
     seen_urls = set()
 
-    for sub_query in sub_queries:
-        search_query = _build_search_query(sub_query)
-        category = _classify_subquery(sub_query)
+    # Run all Tavily searches in parallel
+    with ThreadPoolExecutor(max_workers=len(sub_queries)) as executor:
+        args = [(sq, max_results_per_query) for sq in sub_queries]
+        futures = list(executor.map(_search_single, args))
 
-        try:
-            response = _tavily.search(
-                query=search_query,
-                max_results=max_results_per_query,
-                search_depth="advanced",
-                topic="news" if category == "macro" else "general"
-            )
-            print(f"[WEB SEARCH] [{category}] '{search_query}'")
-
-            for result in response.get("results", []):
-                url = result.get("url", "")
-                if url not in seen_urls:
-                    seen_urls.add(url)
-                    all_results.append({
-                        "title": result.get("title", ""),
-                        "url": url,
-                        "content": result.get("content", ""),
-                        "score": result.get("score", 0.0),
-                        "sub_query": sub_query,
-                        "category": category
-                    })
-        except Exception as e:
-            print(f"[WEB SEARCH] Tavily error on '{sub_query}': {e}")
+    for results, sub_query, category in futures:
+        for result in results:
+            url = result.get("url", "")
+            if url not in seen_urls:
+                seen_urls.add(url)
+                all_results.append({
+                    "title": result.get("title", ""),
+                    "url": url,
+                    "content": result.get("content", ""),
+                    "score": result.get("score", 0.0),
+                    "sub_query": sub_query,
+                    "category": category
+                })
 
     print(f"[WEB SEARCH] Retrieved {len(all_results)} raw results across {len(sub_queries)} sub-queries")
     return all_results

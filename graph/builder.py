@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, END
+from graph.edges import gate1_check, route_after_judge, route_after_crag_judge, gate2_check, should_route_web_first
 from graph.state import AgentState
 from graph.nodes import (
     planner_node,
@@ -12,7 +13,6 @@ from graph.nodes import (
     generator_node,
     reflector_node
 )
-from graph.edges import gate1_check, route_after_judge, route_after_crag_judge, gate2_check
 
 
 def build_graph():
@@ -50,7 +50,14 @@ def build_graph():
 
     # fixed edges — always go here next
     graph.set_entry_point("planner")
-    graph.add_edge("planner", "retriever")
+    graph.add_conditional_edges(
+        "planner",
+        should_route_web_first,
+        {
+            "retrieve": "retriever",      # standard path
+            "web_first": "crag"           # skip retrieval entirely
+        }
+    )
     graph.add_edge("retriever", "gate1")
     graph.add_edge("crag", "post_crag_judge") 
     graph.add_edge("crag_retry", "post_crag_judge")

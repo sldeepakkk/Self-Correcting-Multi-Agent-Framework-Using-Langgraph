@@ -528,10 +528,6 @@ Extract values and provide atomic retry targets if needed."""
             overall_score = (t_a.score * 0.60) + (f_d.score * 0.40)
 
         overall_score = max(0.0, min(1.0, float(overall_score)))
-        if not synthesis_ready and overall_score >= 0.6:
-            synthesis_ready = True
-            print(f"[WEB JUDGE] synthesis_ready overridden — "
-                  f"overall={overall_score:.2f} >= 0.6 with partial aspect coverage")
         verdict = "PASS" if synthesis_ready else ("BORDERLINE" if overall_score >= 0.5 else "FAIL")
 
         return WebJudgeOutput(

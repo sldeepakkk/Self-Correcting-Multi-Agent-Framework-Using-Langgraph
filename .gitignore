@@ -1,30 +1,22 @@
-# Virtual environments
+# Environment
 .venv/
-venv/
-env/
-
-# Python cache
+.env
 __pycache__/
 *.pyc
 
-# Environment variables
-.env
+# Cache — regenerates automatically
+cache/cache.index
+cache/cache_store.json
 
-# VS Code
-.vscode/
+# Vector store — regenerates from seed scripts
+data/vector_store.index
+data/vector_store_docs.json
 
-# Jupyter
-.ipynb_checkpoints/
+# Run logs — too large, not useful to readers
+run_logs/
 
-# OS files
-.DS_Store
-Thumbs.db
+# Episodic memory — personal to your runs
+memory/episodic.db
 
-# Model files (optional)
-*.pt
-*.pth
-*.ckpt
-*.safetensors
-
-# Logs
-*.log
+# Benchmark outputs — keep the plots, skip raw JSON
+benchmarks/results/summary.json

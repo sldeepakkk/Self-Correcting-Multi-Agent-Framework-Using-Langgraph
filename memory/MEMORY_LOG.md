@@ -728,3 +728,199 @@
 
 ---
 
+### Lesson #53 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve executes a 50 basis point rate cut in Q4 2026, compare the historical resilience of operating margins for Infosys (INFY) versus Tata Consultancy Services (TCS) during previous rate cut cycles. Furthermore, synthesize how current Wall Street analysts are adjusting their 12-month target prices for these two specific stocks in anticipation of this US monetary easing.
+
+**Category:** `Comparative historical operating margin resilience of INFY and TCS during previous rate cut cycles`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries comparing historical resilience of operating margins for Infosys (INFY) and Tata Consultancy Services (TCS) during previous rate cut cycles, decompose into two separate sub-queries: one for each company's historical operating margin resilience, and use a more specific and targeted query for each sub-query.
+
+---
+
+### Lesson #54 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the revenue and profit margin for TCS?
+
+**Category:** `finance/company_financials`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For finance-related queries like 'TCS revenue and profit margin', the sub-query decomposition into multiple broad topics ('revenue trend', 'profit margin analysis', 'financial metrics overview') often results in low vector store scores. Consider decomposing into more specific sub-queries like 'TCS revenue growth rate', 'TCS profit margin by quarter', and 'TCS financial performance comparison'.
+
+---
+
+### Lesson #55 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI rate decisions and impact on banking stocks?
+
+**Category:** `macro_rbi_rates`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macro_rbi_rates queries, the sub-query decomposition into three separate topics ('RBI recent rate decisions', 'NSE banking stocks with strong CASA ratios', and 'RBI rate decisions and their impact on NSE banking stocks' CASA ratios and NIM expansion') results in a low judge score. Consider a more integrated approach by combining these topics into a single sub-query that directly addresses the impact of RBI rate decisions on banking stocks.
+
+---
+
+### Lesson #56 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How is the India-US trade deal affecting IT sector stocks on NSE?
+
+**Category:** `macroeconomic_event_sector_impact`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries related to the impact of macroeconomic events on specific sectors (e.g., 'India-US trade deal affecting IT sector stocks on NSE'), use a sub-query decomposition strategy that focuses on the event's impact on the sector's key performance indicators (KPIs) rather than general event developments.
+
+---
+
+### Lesson #57 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the current Nifty 50 valuation and market outlook?
+
+**Category:** `Nifty 50 valuation and market outlook`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For Nifty 50 valuation and market outlook queries, decompose into a single sub-query that directly asks for the current valuation and market outlook, rather than breaking it down into multiple sub-queries.
+
+---
+
+### Lesson #58 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How are rising oil prices impacting Reliance Industries stock?
+
+**Category:** `stock_market_impact`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries related to the impact of rising oil prices on specific stocks, such as Reliance Industries, the sub-query decomposition should be adjusted to prioritize the stock's sector exposure and revenue sensitivity.
+
+---
+
+### Lesson #59 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the outlook for defence sector stocks after India budget 2025?
+
+**Category:** `defence_sector_stock_outlook_india_budget`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For defence sector stock outlook queries related to India budget, decompose into two separate sub-queries: one for budget allocations and one for sector performance trend.
+
+---
+
+### Lesson #60 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Tell me about Infosys financials and what brokerages say about it
+
+**Category:** `financial_analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For financial analysis queries involving multiple companies, decompose into separate sub-queries for each company's financials and brokerages views, rather than a compound query.
+
+---
+
+### Lesson #61 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Infosys analyst consensus and key financial metrics
+
+**Category:** `Infosys analyst consensus and key financial metrics`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For Infosys analyst consensus and key financial metrics queries, the sub-query decomposition into separate aspects (analyst consensus, key financial metrics, comparison) results in a low judge score due to missing key financial metrics. Decompose into a single sub-query that retrieves both analyst consensus and key financial metrics.
+
+---
+
+### Lesson #62 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** BEL and Zen Technologies — fundamentals and defence sector tailwinds
+
+**Category:** `defence_sector_tailwinds_and_company_mentions`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For defence sector queries with multiple company mentions, decompose into separate sub-queries for each company's fundamentals and defence sector tailwinds, then combine results.
+
+---
+
+### Lesson #63 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What happened to NSE small cap stocks this quarter?
+
+**Category:** `NSE small cap stocks performance`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For NSE small cap stocks performance queries, sub-query decomposition should focus on specific stocks' performance rather than broad market trends.
+
+---
+
+### Lesson #64 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** "Assuming the US Federal Reserve executes a 50 basis point rate cut in Q4 2026, compare the historical resilience of operating margins for Infosys (INFY) versus Tata Consultancy Services (TCS) during previous rate cut cycles. Furthermore, synthesize how current Wall Street analysts are adjusting their 12-month target prices for these two specific stocks in anticipation of this US monetary easing."
+
+**Category:** `macroeconomic event impact analysis on specific stocks`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic event impact analysis on specific stocks, decompose the sub-queries into separate topics: event impact, stock resilience, and analyst target price adjustments. This allows for more focused and relevant information retrieval from the vector store.
+
+---
+
+### Lesson #65 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** "Assuming the US Federal Reserve executes a 50 basis point rate cut in Q4 2026, compare the historical resilience of operating margins for Infosys (INFY) versus Tata Consultancy Services (TCS) during previous rate cut cycles. Furthermore, synthesize how current Wall Street analysts are adjusting their 12-month target prices for these two specific stocks in anticipation of this US monetary easing."
+
+**Category:** `macroeconomic event impact analysis on specific stocks`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic event impact analysis on specific stocks, decompose into sub-queries that focus on the event's historical impact on the stock's operating margins and analyst target price adjustments separately, rather than as a compound query.
+
+---
+
+### Lesson #66 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** "Assuming the US Federal Reserve executes a 50 basis point rate cut in Q4 2026, compare the historical resilience of operating margins for Infosys (INFY) versus Tata Consultancy Services (TCS) during previous rate cut cycles. Furthermore, synthesize how current Wall Street analysts are adjusting their 12-month target prices for these two specific stocks in anticipation of this US monetary easing."
+
+**Category:** `macroeconomic_event_impact_analysis_on_specific_stocks`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic event impact analysis on specific stocks, decompose into separate sub-queries for each stock's resilience and analyst target price adjustments, rather than a single compound query.
+
+---
+

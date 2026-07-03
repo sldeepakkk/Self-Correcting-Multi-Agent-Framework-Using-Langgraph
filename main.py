@@ -149,7 +149,10 @@ def run_query(query: str, verbose: bool = True) -> dict:
                   f"response unreliable")
 
     # ── Step 6: Build result ──────────────────────────────────────────────────
-    trace_nodes = [t.get("node", "unknown") for t in final_state.get("trace", [])]
+    trace_nodes = [
+        t if isinstance(t, dict) else {"node": str(t), "status": "success"}
+        for t in final_state.get("trace", [])
+    ]
 
     result = {
         "run_id": run_id,

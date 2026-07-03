@@ -74,31 +74,16 @@ def route_after_judge(state: AgentState) -> str:
 # Only fires if a full failure+recovery cycle occurred.
 # Silence (no memory write) is the correct output for clean runs.
 
+# In gate2_check — edges.py
 def gate2_check(state: AgentState) -> str:
-    """
-    Decides whether to invoke the reflector after a run.
-
-    Reflector fires ONLY when:
-    - CRAG was triggered (retrieval failed)
-    - AND recovery succeeded (web search found usable content)
-
-    If CRAG was triggered but recovery failed → don't write a lesson,
-    there's nothing reliable to learn from.
-
-    If retrieval was clean → don't write anything, no lesson exists.
-    """
     crag_triggered = state.get("crag_triggered", False)
     recovery_succeeded = state.get("recovery_succeeded", False)
+    judge_score = state.get("judge_score", 0.0)
 
-    if crag_triggered and recovery_succeeded:
-        print("[GATE 2] FIRE — CRAG triggered and recovery succeeded → reflector")
+    # Only write lessons when recovery succeeded AND context quality was meaningful
+    if crag_triggered and recovery_succeeded and judge_score >= 0.7:
         return "reflector"
 
-    if crag_triggered and not recovery_succeeded:
-        print("[GATE 2] SKIP — CRAG triggered but recovery failed → nothing to learn")
-        return "end"
-
-    print("[GATE 2] SKIP — clean run, no failure cycle occurred → end")
     return "end"
 
 
@@ -126,3 +111,44 @@ def route_after_crag_judge(state: AgentState) -> str:
 
     print(f"[ROUTE] Recovery failed after retry — final fallback → generator (insufficient data)")
     return "generator"
+
+# ── Web-First Query Classifier ────────────────────────────────────────────────
+
+# Patterns that signal the answer lives on the web, not in the vector store.
+# These queries require current/global data that yfinance and macro seeds don't cover.
+WEB_FIRST_PATTERNS = [
+    # US/Global macro
+    "federal reserve", "fed ", "fomc", "wall street",
+    "us macro", "global ai", "us monetary", "rate cut cycle",
+    "international market", "s&p 500", "nasdaq", "dow jones",
+    # Forward-looking / hypothetical
+    "assuming ", "if the fed", "in q4 2026", "next quarter",
+    "forecast for", "projected", "expected to",
+    # Explicitly current/real-time
+    "this week", "today", "latest news", "breaking",
+    "just announced", "recently announced"
+]
+
+
+def should_route_web_first(state: AgentState) -> str:
+    """
+    Lightweight classifier — runs before retriever, costs zero LLM calls.
+    If the query matches web-first patterns, skip vector retrieval entirely
+    and go straight to CRAG web search.
+
+    This prevents the expensive and predictably-failing path:
+    vector retrieval → judge fail → CRAG
+    For queries the vector store structurally cannot answer.
+
+    Returns "web_first" or "retrieve" for the planner conditional edge.
+    """
+    query = state.get("query", "").lower()
+
+    matched = [p for p in WEB_FIRST_PATTERNS if p in query]
+
+    if matched:
+        print(f"[ROUTE] Web-first patterns matched: {matched} → skipping vector store")
+        return "web_first"
+
+    print(f"[ROUTE] No web-first patterns → standard retrieval")
+    return "retrieve"

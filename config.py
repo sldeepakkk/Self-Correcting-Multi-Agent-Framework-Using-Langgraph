@@ -10,7 +10,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 
 # ── Provider Switch — change this one line only ──────────────────────────────
-PROVIDER = "groq"          # "groq" or "gemini" or "mixed" (planner/judge/reflector = llama, generator = gemini)
+PROVIDER = "mixed"          # "groq" or "gemini" or "mixed" (planner/judge/reflector = llama, generator = gemini)
 
 # ── Models ────────────────────────────────────────────────────────────────────
 if PROVIDER == "gemini":
