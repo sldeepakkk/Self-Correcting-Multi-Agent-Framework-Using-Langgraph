@@ -101,7 +101,7 @@ def run_query(query: str, verbose: bool = True) -> dict:
             "lessons_applied": len(lessons)
         }
 
-        _log_run(result)
+        _log_run(result, final_context="")
         return result
 
     # ── Step 3: Build AgentState ──────────────────────────────────────────────
@@ -168,7 +168,7 @@ def run_query(query: str, verbose: bool = True) -> dict:
         "lessons_applied": len(lessons)
     }
 
-    _log_run(result)
+    _log_run(result, final_context=final_state.get("final_context", ""))
 
     if verbose:
         print(f"\n[MAIN] Done — path={result['path_taken']}, "
@@ -183,7 +183,7 @@ def run_query(query: str, verbose: bool = True) -> dict:
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
-def _log_run(result: dict) -> None:
+def _log_run(result: dict, final_context: str = "") -> None:
     """
     Appends one JSON line to run_logs/runs.jsonl.
     Each line is one complete run record.
@@ -203,7 +203,9 @@ def _log_run(result: dict) -> None:
         "latency_ms": result["latency_ms"],
         "response_length": len(result.get("response", "")),
         "trace_nodes": result.get("trace", []),
-        "lessons_applied": result.get("lessons_applied", 0)
+        "lessons_applied": result.get("lessons_applied", 0),
+        "context_preview": final_context[:2000],
+        "context_length": len(final_context)
     }
 
     with open(RUN_LOG_PATH, "a") as f:

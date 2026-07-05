@@ -81,13 +81,12 @@ def build_graph():
         }
     )
 
-    graph.add_edge("assemble_context", "generator")
-
     graph.add_conditional_edges(
-    "post_crag_judge",
-    route_after_crag_judge,
-    {"generator": "generator", "crag_retry": "crag_retry"}
+        "post_crag_judge", route_after_crag_judge,
+        {"generator": "generator", "crag_retry": "crag_retry", "generator_partial": "generator"}
     )
+
+    graph.add_edge("assemble_context", "generator")
 
     graph.add_conditional_edges(
         "generator",

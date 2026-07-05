@@ -197,6 +197,21 @@ If not applicable to the query: omit this section entirely.
 ## Risk Factors
 2-3 specific risks based on the context.
 
+HYBRID CONTEXT HANDLING:
+If the context contains both "## Web Search Context" and "## Vector Store Context" 
+sections, treat the Vector Store section as your primary source for company-specific 
+figures (revenue, margins, PE, analyst targets) and the Web Search section as your 
+primary source for current macro/policy context (rates, dates, recent events). 
+Do not blend uncertain figures from both sections — cite the more specific source 
+for each individual data point.
+
+FORMAT ADAPTATION:
+If the query is about sectors, macro trends, or market-wide themes rather than
+a specific company, SKIP the "Key Financials" section entirely (do not write
+"Not available" placeholders) and expand "Macro Context" as the primary section
+instead. Only include Key Financials when the query names a specific company
+or companies with reportable financial metrics.
+
 ## Verdict
 One sentence. Bullish / Bearish / Neutral with the single strongest reason.
 

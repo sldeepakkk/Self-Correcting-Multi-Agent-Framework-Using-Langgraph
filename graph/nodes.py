@@ -1,3 +1,4 @@
+from graph import state
 from graph.state import AgentState
 from agents.planner import run_planner
 from agents.judge import run_judge, run_judge_on_text, run_web_judge
@@ -109,41 +110,6 @@ def gate1_node(state: AgentState) -> dict:
         }]
     }
 
-# # ── Node 3: Gate 1 ────────────────────────────────────────────────────────────
-
-# def gate1_node(state: AgentState) -> dict:
-#     docs = state.get("retrieved_docs", [])
-#     top_score = docs[0].get("score", 0.0) if docs else 0.0
-#     sources = [d.get("source", "") for d in docs]
-#     unique_sources = len(set(sources))
-    
-#     # NEW LOGIC: Use the length of the sub_queries list. 
-#     # If the planner generated more than 1 sub-query, it's compound.
-#     sub_queries = state.get("sub_queries", [])
-#     is_compound = len(sub_queries) > 1 
-
-#     if is_compound:
-#         passed = False
-#         reason = f"Compound query detected ({len(sub_queries)} sub-queries) — forcing adversarial Judge evaluation."
-#     else:
-#         passed = (
-#             top_score >= 0.65 and
-#             len(docs) >= 2 and
-#             unique_sources >= 2
-#         )
-#         reason = "Single-topic heuristic check."
-
-#     return {
-#         "gate1_passed": passed,
-#         "trace": [{
-#             "node": "gate1",
-#             "passed": passed,
-#             "top_score": top_score,
-#             "doc_count": len(docs),
-#             "unique_sources": unique_sources,
-#             "reason": reason
-#         }]
-#     }
 
 
 # ── Node 4: Judge ─────────────────────────────────────────────────────────────
@@ -189,17 +155,12 @@ def crag_node(state: AgentState) -> dict:
     preserved_context = ""
     if is_compound and retrieved_docs:
         MIN_PRESERVE_SCORE = 0.30
-        preserved_docs = [
-            d for d in retrieved_docs
-            if d.get("score", 0.0) >= MIN_PRESERVE_SCORE
-        ]
+        preserved_docs = [d for d in retrieved_docs if d.get("score", 0.0) >= MIN_PRESERVE_SCORE]
         if preserved_docs:
             preserved_context = "\n\n".join([
                 f"[Vector Store — {d.get('source', 'unknown')}]\n{d.get('content', '')}"
                 for d in preserved_docs[:3]
             ])
-            print(f"[NODE: CRAG] Compound query — preserving {len(preserved_docs)} "
-                  f"vector store docs (score >= {MIN_PRESERVE_SCORE})")
 
     refined_context, prefilter_passed = run_crag_fallback(
         query=state["query"],
@@ -207,16 +168,21 @@ def crag_node(state: AgentState) -> dict:
         judge_score=state.get("judge_score", 0.0)
     )
 
+    # If the refiner itself flagged failure, do NOT trust refined_context's
+    # content even if preserved vector docs exist alongside it — but DO still
+    # allow preserved_context alone to go to the judge, since that's real
+    # vector store data, not refiner-flagged garbage.
+    if not prefilter_passed:
+        print(f"[NODE: CRAG] Refiner flagged failure — discarding web content, "
+              f"keeping only preserved vector context (if any)")
+        refined_context = ""   # discard the flagged-bad web content entirely
+
     if preserved_context and refined_context:
-        combined_context = (
-            f"## Web Search Context\n{refined_context}"
-            f"\n\n## Vector Store Context\n{preserved_context}"
-        )
+        combined_context = f"## Web Search Context\n{refined_context}\n\n## Vector Store Context\n{preserved_context}"
     elif refined_context:
         combined_context = refined_context
     elif preserved_context:
         combined_context = preserved_context
-        print(f"[NODE: CRAG] Web failed — using preserved vector context only")
     else:
         combined_context = ""
 
@@ -233,110 +199,6 @@ def crag_node(state: AgentState) -> dict:
         }]
     }
 
-
-# ── Node 6: Post-CRAG Judge ───────────────────────────────────────────────────
-
-# def post_crag_judge_node(state: AgentState) -> dict:
-#     """
-#     Judges the CRAG-refined web context using the same adversarial rubric
-#     applied to vector store retrieval. Closes the architectural gap where
-#     CRAG recovery was previously trusted on a cheap heuristic alone.
-
-#     recovery_succeeded is set HERE, based on a real judge score.
-#     """
-#     print(f"\n[NODE: POST-CRAG JUDGE] Evaluating refined web context...")
-
-#     refined_context = state.get("final_context", "")
-
-#     if not refined_context:
-#         print("[NODE: POST-CRAG JUDGE] No refined context to judge — auto-fail")
-#         return {
-#             "recovery_succeeded": False,
-#             "trace": [{
-#                 "node": "post_crag_judge",
-#                 "score": 0.0,
-#                 "verdict": "FAIL",
-#                 "reasoning": "No refined context available"
-#             }]
-#         }
-
-#     result = run_judge_on_text(
-#         query=state["query"],
-#         text=refined_context,
-#         source_label="web_search_refined"
-#     )
-
-#     recovery_succeeded = result.score >= JUDGE_RELEVANCE_THRESHOLD
-
-#     print(f"[NODE: POST-CRAG JUDGE] Score: {result.score:.4f} | "
-#           f"Recovery: {'SUCCESS' if recovery_succeeded else 'FAILED'}")
-#     print(f"[NODE: POST-CRAG JUDGE] Reasoning: {result.reasoning}")
-
-#     return {
-#         "recovery_succeeded": recovery_succeeded,
-#         "judge_score": result.score,
-#         "trace": [{
-#             "node": "post_crag_judge",
-#             "score": result.score,
-#             "verdict": result.verdict,
-#             "reasoning": result.reasoning,
-#             "recovery_succeeded": recovery_succeeded
-#         }]
-#     }
-
-
-# def post_crag_judge_node(state: AgentState) -> dict:
-#     """
-#     Judges the CRAG-refined web context using the same adversarial rubric
-#     applied to vector store retrieval.
-
-#     UPDATED: now stores missing_information to crag_missing_info in state,
-#     so route_after_crag_judge → crag_retry_node can use it for a corrective
-#     second attempt instead of giving up after one search.
-#     """
-#     print(f"\n[NODE: POST-CRAG JUDGE] Evaluating refined web context...")
-
-#     refined_context = state.get("final_context", "")
-
-#     if not refined_context:
-#         print("[NODE: POST-CRAG JUDGE] No refined context to judge — auto-fail")
-#         return {
-#             "recovery_succeeded": False,
-#             "crag_missing_info": ["No content was retrieved at all"],
-#             "trace": [{
-#                 "node": "post_crag_judge",
-#                 "score": 0.0,
-#                 "verdict": "FAIL",
-#                 "reasoning": "No refined context available"
-#             }]
-#         }
-
-#     result = run_judge_on_text(
-#         query=state["query"],
-#         text=refined_context,
-#         source_label="web_search_refined"
-#     )
-
-#     recovery_succeeded = result.score >= JUDGE_RELEVANCE_THRESHOLD
-
-#     print(f"[NODE: POST-CRAG JUDGE] Score: {result.score:.4f} | "
-#           f"Recovery: {'SUCCESS' if recovery_succeeded else 'FAILED'}")
-#     print(f"[NODE: POST-CRAG JUDGE] Reasoning: {result.reasoning}")
-
-#     return {
-#         "recovery_succeeded": recovery_succeeded,
-#         "judge_score": result.score,
-#         "crag_missing_info": result.missing_information,
-#         "trace": [{
-#             "node": "post_crag_judge",
-#             "score": result.score,
-#             "verdict": result.verdict,
-#             "reasoning": result.reasoning,
-#             "recovery_succeeded": recovery_succeeded,
-#             "missing_information": result.missing_information
-#         }]
-#     }
-
 def post_crag_judge_node(state: AgentState) -> dict:
     """
     Aspect-based evaluation of CRAG-refined web context.
@@ -352,20 +214,25 @@ def post_crag_judge_node(state: AgentState) -> dict:
     is_compound = state.get("is_compound_query", False)
 
     if not refined_context:
+        print("[NODE: POST-CRAG JUDGE] No refined context to judge — auto-fail")
+        # Use the planner's existing decomposed sub_queries as retry material,
+        # not the raw original query — sub_queries are already properly atomic.
+        fallback_retry = state.get("sub_queries", [state.get("query", "")])[:3]
         fail_aspect = {"score": 0.0, "present": False, "gap": "no content"}
         return {
             "recovery_succeeded": False,
             "judge_score": 0.0,
             "judge_aspect_scores": {
-                "topic_a": fail_aspect,
-                "topic_b": fail_aspect,
-                "factual_density": fail_aspect,
-                "synthesis_ready": False,
-                "retry_focus": [state.get("query", "")]
-            },
-            "trace": [{"node": "post_crag_judge", "score": 0.0,
-                       "verdict": "FAIL", "reasoning": "No context"}]
-        }
+            "topic_a": fail_aspect,
+            "topic_b": fail_aspect,
+            "factual_density": fail_aspect,
+            "synthesis_ready": False,
+            "retry_focus": fallback_retry
+        },
+        "crag_missing_info": fallback_retry,
+        "trace": [{"node": "post_crag_judge", "score": 0.0,
+                   "verdict": "FAIL", "reasoning": "No content"}]
+    }
 
     result = run_web_judge(
         query=state["query"],
@@ -415,70 +282,6 @@ def post_crag_judge_node(state: AgentState) -> dict:
         }]
     }
 
-
-# ── Node: CRAG Retry (NEW) ────────────────────────────────────────────────────
-
-# def crag_retry_node(state: AgentState) -> dict:
-#     """
-#     The actual self-correction step. Uses missing_information from the failed
-#     post_crag_judge pass to reformulate and retry the web search once.
-
-#     This closes the gap where CRAG produced structured failure feedback
-#     (missing_information) but never used it — it was being logged and discarded.
-#     Now it directly drives a second, better-targeted search attempt.
-#     """
-#     print(f"\n[NODE: CRAG RETRY] Attempting corrective retry...")
-
-#     missing_info = state.get("crag_missing_info", [])
-
-#     refined_context, prefilter_passed = run_crag_retry(
-#         query=state["query"],
-#         missing_information=missing_info
-#     )
-
-#     return {
-#         "final_context": refined_context,
-#         "crag_retry_count": state.get("crag_retry_count", 0) + 1,
-#         "trace": [{
-#             "node": "crag_retry",
-#             "missing_info_used": missing_info,
-#             "prefilter_passed": prefilter_passed,
-#             "context_length": len(refined_context)
-#         }]
-#     }
-
-# def crag_retry_node(state: AgentState) -> dict:
-#     """
-#     Corrective retry using aspect-based feedback.
-#     retry_focus comes from the web judge's structured aspect evaluation —
-#     these are targeted queries for the specific missing dimension,
-#     not a generic rerun of the original sub-queries.
-#     """
-#     print(f"\n[NODE: CRAG RETRY] Targeted retry using aspect-based feedback...")
-
-#     aspect_scores = state.get("judge_aspect_scores", {})
-#     retry_focus = aspect_scores.get("retry_focus", [])
-
-#     if not retry_focus:
-#         retry_focus = state.get("crag_missing_info", [state.get("query", "")])
-
-#     print(f"[NODE: CRAG RETRY] Retry queries from aspect feedback: {retry_focus}")
-
-#     refined_context, prefilter_passed = run_crag_retry(
-#         query=state["query"],
-#         missing_information=retry_focus
-#     )
-
-#     return {
-#         "final_context": refined_context,
-#         "crag_retry_count": state.get("crag_retry_count", 0) + 1,
-#         "trace": [{
-#             "node": "crag_retry",
-#             "retry_queries": retry_focus,
-#             "prefilter_passed": prefilter_passed,
-#             "context_length": len(refined_context)
-#         }]
-#     }
 
 # ── Node 7: Assemble Context (medium path) ────────────────────────────────────
 
@@ -563,53 +366,6 @@ def crag_retry_node(state: AgentState) -> dict:
 
 # ── Node 8: Generator ─────────────────────────────────────────────────────────
 
-# def generator_node(state: AgentState) -> dict:
-#     """
-#     Synthesizes the final research report from verified context.
-#     Handles all three path outcomes: clean, CRAG success, CRAG failure.
-#     CRAG failure returns calibrated insufficient-data response.
-#     """
-#     print(f"\n[NODE: GENERATOR] Synthesizing report...")
-#     print(f"  CRAG triggered: {state.get('crag_triggered', False)}")
-#     print(f"  Recovery succeeded: {state.get('recovery_succeeded', False)}")
-#     print(f"  Context length: {len(state.get('final_context', ''))} chars")
-
-#     response = run_generator(
-#         query=state["query"],
-#         final_context=state.get("final_context", ""),
-#         crag_triggered=state.get("crag_triggered", False),
-#         recovery_succeeded=state.get("recovery_succeeded", False),
-#         episodic_lessons=state.get("episodic_lessons", [])
-#     )
-
-#     crag = state.get("crag_triggered", False)
-#     recovery = state.get("recovery_succeeded", False)
-
-#     if not crag:
-#         path = "medium"
-#     elif crag and recovery:
-#         path = "slow"
-#     else:
-#         path = "slow_failed"
-
-#     print(f"[NODE: GENERATOR] Done — path={path}, "
-#           f"response={len(response)} chars")
-
-#     return {
-#         "response": response,
-#         "path_taken": path,
-#         "trace": [{
-#             "node": "generator",
-#             "path": path,
-#             "response_length": len(response),
-#             "context_source": "web" if crag and recovery else
-#                               "insufficient" if crag and not recovery else
-#                               "vector_store"
-#         }]
-#     }
-
-# ── Node 8: Generator ─────────────────────────────────────────────────────────
-
 def generator_node(state: AgentState) -> dict:
     """
     Synthesizes the final research report from verified context.
@@ -623,9 +379,14 @@ def generator_node(state: AgentState) -> dict:
 
     crag = state.get("crag_triggered", False)
     recovery = state.get("recovery_succeeded", False)
+    judge_score = state.get("judge_score", 0.0)
+
+    # Partial case: retry exhausted, score close to threshold with strong core aspects
+    is_partial = (crag and not recovery and judge_score >= 0.65 and
+                  state.get("crag_retry_count", 0) >= 1)
 
     # Fast-fail short-circuit: Do not invoke the 70B model if context is dead
-    if crag and not recovery:
+    if crag and not recovery and not is_partial:
         path = "slow_failed"
         response = "## Research Report — Insufficient Data\n\n**Status:** This query requires current information that could not be retrieved reliably. The vector store did not contain relevant documents, and web search did not return financially usable content.\n\n**Confidence:** Low — no synthesis attempted to avoid hallucination."
         

@@ -35,37 +35,56 @@ from benchmarks.plain_llm import run_plain_llm, judge_response
 # macro/current (CRAG should trigger), and repeats (cache should hit)
 
 QUERIES = [
-    # Vector store coverage — medium path expected
+    "Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?",
     "What are the fundamentals and analyst view for Infosys?",
-    "What is the revenue and profit margin for TCS?",
-    "Give me the 52-week range and PE ratio for Reliance Industries",
-    "What do analysts recommend for HDFC Bank?",
-    "What is the market cap and analyst target for Wipro?",
-
-    # Macro / current events — CRAG expected
     "What are the latest RBI rate decisions and impact on banking stocks?",
-    "How is the India-US trade deal affecting IT sector stocks on NSE?",
-    "What is the current Nifty 50 valuation and market outlook?",
-    "How are rising oil prices impacting Reliance Industries stock?",
-    "What is the outlook for defence sector stocks after India budget 2025?",
+    "Compare TCS and Infosys on growth, margins, and analyst sentiment, and identify which appears stronger today.",
+    "What is the analyst consensus on Infosys and how strong are its key financial metrics?"
 
-    # Repeat queries — cache hits expected after first run
-    "What are the fundamentals and analyst view for Infosys?",    # repeat of Q1
-    "What are the latest RBI rate decisions and impact on banking stocks?",  # repeat of Q6
-    "What is the revenue and profit margin for TCS?",             # repeat of Q2
 
-    # Paraphrases — semantic cache should catch these
-    "Tell me about Infosys financials and what brokerages say about it",
-    "Infosys analyst consensus and key financial metrics",
+    # #10 queries to benchmark
+    # "What are Infosys's fundamentals, valuation, and analyst sentiment, and how do they compare with its historical averages?",
+    # "Compare Reliance Industries' valuation metrics and business segments to determine key investment drivers.",
+    # "How is the India-US trade agreement expected to affect Indian IT companies over the next 12 months?",
+    # "Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?",
+    # "What are Infosys's fundamentals, valuation, and analyst sentiment, and how do they compare with its historical averages?",
+    # "Summarize Infosys financial performance and what analysts currently think about the stock.",
+    # "What is the analyst consensus on Infosys and how strong are its key financial metrics?",
+    # "Compare TCS and Infosys on growth, margins, and analyst sentiment, and identify which appears stronger today.",
+    # "How does the current energy market outlook affect IEX and related NSE energy companies?",
+    # "Assuming India increases defence spending by 20% next year, which listed defence companies would benefit most and why?",
 
-    # Mixed — partial vector store coverage
-    "Compare TCS and Infosys on revenue growth and analyst sentiment",
-    "What is the energy sector outlook and how does it affect IEX on NSE?",
-    "BEL and Zen Technologies — fundamentals and defence sector tailwinds",
+    # # Vector store coverage — medium path expected
+    # "What are Infosys's fundamentals, valuation, and analyst sentiment, and how do they compare with its historical averages?",
+    # "Analyze TCS revenue growth, operating margins, and analyst outlook over the last year.",
+    # "Compare Reliance Industries' valuation metrics and business segments to determine key investment drivers.",
+    # "What are the strengths and risks of HDFC Bank based on fundamentals and analyst sentiment?",
+    # "Compare Wipro and Infosys on profitability, growth, and analyst expectations.",
 
-    # Edge cases
-    "What happened to NSE small cap stocks this quarter?",
-    "Which NSE stocks are best positioned for RBI rate cuts?",
+    # # Macro / current events — CRAG + web-first expected
+    # "What are the latest RBI policy decisions and their impact on Indian banking stocks?",
+    # "How is the India-US trade agreement expected to affect Indian IT companies over the next 12 months?",
+    # "What is the current Nifty 50 valuation relative to historical averages, and what are analysts expecting next?",
+    # "How are recent oil price movements affecting Reliance Industries and other energy-linked NSE stocks?",
+    # "Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?",
+
+    # # Repeat queries — cache hits expected after first run
+    # "What are Infosys's fundamentals, valuation, and analyst sentiment, and how do they compare with its historical averages?",
+    # "What are the latest RBI policy decisions and their impact on Indian banking stocks?",
+    # "Analyze TCS revenue growth, operating margins, and analyst outlook over the last year.",
+
+    # # Paraphrases — semantic cache should catch these
+    # "Summarize Infosys financial performance and what analysts currently think about the stock.",
+    # "What is the analyst consensus on Infosys and how strong are its key financial metrics?",
+
+    # # Mixed — partial vector store + CRAG coverage
+    # "Compare TCS and Infosys on growth, margins, and analyst sentiment, and identify which appears stronger today.",
+    # "How does the current energy market outlook affect IEX and related NSE energy companies?",
+    # "Analyze BEL and Zen Technologies in the context of India's defence spending trends and future opportunities.",
+
+    # # Edge cases
+    # "Assuming India increases defence spending by 20% next year, which listed defence companies would benefit most and why?",
+    # "Compare the likely winners and losers on NSE if RBI cuts rates twice over the next year.",
 ]
 
 RESULTS_DIR = "benchmarks/results"
@@ -116,7 +135,7 @@ def run_all_plain(queries: list[str]) -> list[dict]:
 
     # Only run first 10 unique queries for comparison
     # (no point running repeats/paraphrases through plain LLM)
-    unique_queries = queries[:10]
+    unique_queries = queries[:5]
     results = []
 
     for i, query in enumerate(unique_queries):

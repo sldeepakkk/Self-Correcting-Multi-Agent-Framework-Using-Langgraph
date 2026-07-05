@@ -58,15 +58,29 @@ def route_after_judge(state: AgentState) -> str:
     Routes based on judge score.
     Above threshold → generator (medium path — retrieval was adequate)
     Below threshold → crag (slow path — discard and search web)
+
+    BORDERLINE exception: if the judge scored in the 0.5-0.6 range AND
+    Gate 1's top retrieval score was close to its own threshold (>= 0.55),
+    treat this as adequate rather than forcing an expensive CRAG cycle.
+    This closes the gap where marginally-good retrieval was being treated
+    identically to genuine retrieval failure.
     """
     score = state.get("judge_score", 0.0)
+    docs = state.get("retrieved_docs", [])
+    top_retrieval_score = docs[0].get("score", 0.0) if docs else 0.0
 
     if score >= JUDGE_RELEVANCE_THRESHOLD:
         print(f"[ROUTE] Judge score {score:.4f} >= {JUDGE_RELEVANCE_THRESHOLD} → generator")
         return "generator"
-    else:
-        print(f"[ROUTE] Judge score {score:.4f} < {JUDGE_RELEVANCE_THRESHOLD} → CRAG fallback")
-        return "crag"
+
+    # Borderline exception — close on both signals, don't force expensive CRAG
+    if 0.5 <= score < JUDGE_RELEVANCE_THRESHOLD and top_retrieval_score >= 0.55:
+        print(f"[ROUTE] Judge score {score:.4f} BORDERLINE but retrieval score "
+              f"{top_retrieval_score:.4f} >= 0.55 → generator (skip CRAG)")
+        return "generator"
+
+    print(f"[ROUTE] Judge score {score:.4f} < {JUDGE_RELEVANCE_THRESHOLD} → CRAG fallback")
+    return "crag"
 
 
 # ── Gate 2 ────────────────────────────────────────────────────────────────────
@@ -97,9 +111,18 @@ def route_after_crag_judge(state: AgentState) -> str:
         (generator_node already handles this gracefully via the
         insufficient-data response — this is the genuine final fallback,
         reached only after the system has actually tried to correct itself)
+
+    EXCEPTION: if retry has been exhausted AND the overall score is close
+    to the threshold (>= 0.65) with strong topic_a and factual density,
+    allow synthesis with appropriate hedging rather than a blank refusal.
+    This only fires after retry_count >= 1 so it never weakens the
+    first-pass bar — it's a last-resort "partial answer beats no answer"
+    exception, not a threshold change.
     """
     recovery_succeeded = state.get("recovery_succeeded", False)
     retry_count = state.get("crag_retry_count", 0)
+    judge_score = state.get("judge_score", 0.0)
+    aspect_scores = state.get("judge_aspect_scores", {})
 
     if recovery_succeeded:
         print("[ROUTE] Recovery succeeded → generator")
@@ -108,6 +131,14 @@ def route_after_crag_judge(state: AgentState) -> str:
     if retry_count < 1:
         print(f"[ROUTE] Recovery failed, retry_count={retry_count} → crag_retry")
         return "crag_retry"
+
+    # Post-retry exception: close-but-not-quite content, don't waste it
+    topic_a_ok = aspect_scores.get("topic_a", {}).get("score", 0.0) >= 0.7
+    factual_ok = aspect_scores.get("factual_density", {}).get("score", 0.0) >= 0.6
+    if judge_score >= 0.65 and topic_a_ok and factual_ok:
+        print(f"[ROUTE] Retry exhausted, but score={judge_score:.2f} with strong "
+              f"topic_a/factual density → generator (partial synthesis with hedging)")
+        return "generator_partial"
 
     print(f"[ROUTE] Recovery failed after retry — final fallback → generator (insufficient data)")
     return "generator"
@@ -123,10 +154,13 @@ WEB_FIRST_PATTERNS = [
     "international market", "s&p 500", "nasdaq", "dow jones",
     # Forward-looking / hypothetical
     "assuming ", "if the fed", "in q4 2026", "next quarter",
-    "forecast for", "projected", "expected to",
+    "forecast for", "projected",
     # Explicitly current/real-time
-    "this week", "today", "latest news", "breaking",
-    "just announced", "recently announced"
+    "this week",
+    "latest news",
+    "breaking",
+    "just announced",
+    "recently announced"
 ]
 
 

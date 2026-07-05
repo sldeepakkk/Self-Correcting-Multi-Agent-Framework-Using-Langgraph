@@ -48,18 +48,10 @@ def run_crag_fallback(
 
     return refined_context, success
 
-
 def run_crag_retry(
     query: str,
     missing_information: list[str]
 ) -> tuple[str, bool]:
-    """
-    Corrective retry — uses isolated atomic search queries based on judge feedback.
-
-    Takes retry_focus items directly as search queries — they were generated
-    by the aspect judge specifically as targeted search strings.
-    No prefix injection — web_search.py classifier handles routing correctly.
-    """
     if not missing_information:
         print("[CRAG RETRY] No missing_information to retry with — skipping retry")
         return "", False
@@ -75,11 +67,15 @@ def run_crag_retry(
                 .replace("-", "")
                 .strip()
         )
+        # REMOVED: word-truncation to first 3 words. That line was destroying
+        # legitimate multi-word retry queries and full sub-query fallbacks.
+        # Judge-generated retry_focus items are already short phrases by
+        # prompt design — no additional truncation needed here.
         if clean_item:
             retry_queries.append(clean_item)
 
     if not retry_queries:
-        retry_queries = [query]    # last resort — use original query
+        retry_queries = [query]
 
     print(f"[CRAG RETRY] Dispatching atomic topics to web_search: {retry_queries}")
     raw_results = search_web(retry_queries, max_results_per_query=5)

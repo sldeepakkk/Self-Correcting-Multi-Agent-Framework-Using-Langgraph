@@ -924,3 +924,689 @@
 
 ---
 
+### Lesson #67 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the revenue and profit margin for TCS?
+
+**Category:** `company_financials`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For financial metrics queries about a single company, decompose into sub-queries that focus on a specific aspect of the company's financials, rather than broad topics like 'financial metrics comparison'.
+
+---
+
+### Lesson #68 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI rate decisions and impact on banking stocks?
+
+**Category:** `macro_rbi_rates`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macro_rbi_rates queries, the sub-query decomposition into three separate sub-queries ('What are RBI's latest rate decisions?', 'What are banking stocks fundamentals?', 'RBI rate decision impact on Indian banking sector stock prices analyst view') is too broad and does not effectively capture the relationship between RBI rate decisions and banking stocks. Decompose into: 'What are RBI's latest rate decisions?' + 'What is the impact of RBI rate decisions on banking stocks?'
+
+---
+
+### Lesson #69 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How is the India-US trade deal affecting IT sector stocks on NSE?
+
+**Category:** `trade_deal_sector_impact`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries related to the impact of trade deals on specific sectors, decompose into two separate sub-queries: one for the trade deal terms and another for the sector fundamentals.
+
+---
+
+### Lesson #70 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the current Nifty 50 valuation and market outlook?
+
+**Category:** `market_outlook`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For market outlook queries, especially those involving compound queries like 'What is the current Nifty 50 valuation and market outlook?', decompose into separate sub-queries for 'market outlook' and 'valuation' and then combine the results.
+
+---
+
+### Lesson #71 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the outlook for defence sector stocks after India budget 2025?
+
+**Category:** `defence_sector_stock_outlook`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For defence sector stock outlook queries related to India budget announcements, decompose into two separate sub-queries: one for the budget announcements and one for the defence sector stock outlook. This will allow for more targeted and relevant information retrieval.
+
+---
+
+### Lesson #72 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** BEL and Zen Technologies — fundamentals and defence sector tailwinds
+
+**Category:** `defence_sector_multiple_companies`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For defence sector queries involving multiple companies (e.g., BEL and Zen Technologies), use a more focused sub-query decomposition strategy that prioritizes specific company fundamentals and tailwinds over broad bridge queries.
+
+---
+
+### Lesson #73 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What happened to NSE small cap stocks this quarter?
+
+**Category:** `NSE small cap stocks performance`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For NSE small cap stocks performance queries, sub-query decomposition should focus on specific performance metrics (e.g., returns, volatility) rather than broad topics (e.g., market trends, performance analysis).
+
+---
+
+### Lesson #74 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Which NSE stocks are best positioned for RBI rate cuts?
+
+**Category:** `NSE stocks best positioned for RBI rate cuts`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries about RBI rate cuts and NSE stocks, decompose into sub-queries that focus on specific stocks' interest rate sensitivity and historical repo rate change impact.
+
+---
+
+### Lesson #75 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Analyze TCS revenue growth, operating margins, and analyst outlook over the last year.
+
+**Category:** `financial_analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For financial analysis queries focusing on multiple aspects of a company's performance, such as revenue growth, operating margins, and analyst outlook, consider using a compound query decomposition strategy to retrieve relevant information from vector store in a single step.
+
+---
+
+### Lesson #76 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI policy decisions and their impact on Indian banking stocks?
+
+**Category:** `RBI policy impact on Indian banking stocks`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For RBI policy impact on Indian banking stocks queries, decompose into two separate sub-queries: one for RBI policy decisions and another for Indian banking stocks fundamentals.
+
+---
+
+### Lesson #77 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How is the India-US trade agreement expected to affect Indian IT companies over the next 12 months?
+
+**Category:** `trade_agreement_sector_impact`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries related to the impact of trade agreements on specific sectors, decompose into a more focused sub-query on the sector's fundamentals and a separate sub-query on the trade agreement's terms.
+
+---
+
+### Lesson #78 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the current Nifty 50 valuation relative to historical averages, and what are analysts expecting next?
+
+**Category:** `valuation`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For valuation-related queries like 'Nifty 50 valuation', decompose into sub-queries that focus on specific metrics (e.g., 'Nifty 50 current valuation' and 'Nifty 50 historical valuation averages') and include analyst expectations in the sub-queries to improve retrieval scores.
+
+---
+
+### Lesson #79 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the analyst consensus on Infosys and how strong are its key financial metrics?
+
+**Category:** `analyst consensus and key financial metrics`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For analyst consensus and key financial metrics queries, consider a more focused sub-query decomposition strategy, breaking down the query into a single sub-query that targets specific analyst consensus strength and industry peer comparison metrics.
+
+---
+
+### Lesson #80 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How does the current energy market outlook affect IEX and related NSE energy companies?
+
+**Category:** `energy market outlook affecting IEX and related NSE energy companies`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For energy market outlook queries related to specific NSE energy companies, decompose into two sub-queries: one for the general energy market outlook and another for the company-specific impact analysis.
+
+---
+
+### Lesson #81 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Analyze BEL and Zen Technologies in the context of India's defence spending trends and future opportunities.
+
+**Category:** `defence-related company analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For defence-related queries involving specific companies (e.g., BEL and Zen Technologies), decompose into a single sub-query focusing on the company fundamentals and performance analysis, and a separate sub-query on the broader defence spending trends and future opportunities. This will allow for more targeted and relevant information retrieval.
+
+---
+
+### Lesson #82 — 2026-07-03
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming India increases defence spending by 20% next year, which listed defence companies would benefit most and why?
+
+**Category:** `defence spending impact analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For defence spending impact analysis queries, decompose into two separate sub-queries: 'defence spending trends and future opportunities in India' and 'listed defence companies in India fundamentals and performance analysis'. Then, use a bridge query to combine the results of these two sub-queries, rather than a single compound query.
+
+---
+
+### Lesson #83 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How is the India-US trade agreement expected to affect Indian IT companies over the next year?
+
+**Category:** `trade_agreement_industry_impact`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries related to the impact of trade agreements on specific industries (e.g., 'India-US trade agreement expected impact on Indian IT companies'), decompose into a single sub-query focused on the trade agreement's terms and impact, and a separate sub-query focused on the industry's fundamentals and performance analysis.
+
+---
+
+### Lesson #84 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the analyst consensus on Infosys and how strong are its key financial metrics?
+
+**Category:** `analyst consensus and key financial metrics`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For analyst consensus and key financial metrics queries, decompose into separate sub-queries for analyst consensus strength and key financial metrics analysis, then combine the results.
+
+---
+
+### Lesson #85 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Analyze TCS revenue growth, operating margins, and analyst outlook over the last year.
+
+**Category:** `TCS financial performance analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries involving TCS financial performance, use a sub-query decomposition strategy that focuses on retrieving specific financial metrics (e.g., revenue growth, operating margins, analyst outlook) separately, rather than a compound query that attempts to retrieve all relevant information in a single step.
+
+---
+
+### Lesson #86 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI policy decisions and their impact on Indian banking stocks?
+
+**Category:** `RBI policy decisions and their impact on Indian banking stocks`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For RBI policy and banking stocks queries, the sub-query decomposition should be adjusted to focus on the most recent RBI policy decisions and their direct impact on banking stocks, rather than relying on analyst views and financial information.
+
+---
+
+### Lesson #87 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How is the India-US trade agreement expected to affect Indian IT companies over the next 12 months?
+
+**Category:** `trade_agreement_sector_impact`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries about the impact of trade agreements on specific sectors, decompose into a broad overview of the agreement and its expected effects, and a detailed analysis of the sector's fundamentals and performance. Specifically, for queries like 'India-US trade agreement expected impact on Indian IT companies', decompose into 'India-US trade agreement terms and impact on Indian IT sector' and 'Indian IT sector fundamentals and performance analysis over the next 12 months'.
+
+---
+
+### Lesson #88 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the current Nifty 50 valuation relative to historical averages, and what are analysts expecting next?
+
+**Category:** `valuation`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For valuation-related queries, especially those requiring multiple sub-queries, consider using a more focused sub-query decomposition strategy, such as retrieving the most relevant sub-queries first and then combining them.
+
+---
+
+### Lesson #89 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?
+
+**Category:** `macroeconomic impact analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic impact analysis queries, specifically those involving rate cuts and sectoral analysis, decompose into a two-stage approach: first, retrieve general information on the rate cut's global impact, and second, use this information to inform a more targeted search for sector-specific effects.
+
+---
+
+### Lesson #90 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the analyst consensus on Infosys and how strong are its key financial metrics?
+
+**Category:** `analyst consensus and key financial metrics`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For analyst consensus and key financial metrics queries, consider using a single sub-query that combines both topics, rather than decomposing into separate sub-queries.
+
+---
+
+### Lesson #91 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Compare TCS and Infosys on growth, margins, and analyst sentiment, and identify which appears stronger today.
+
+**Category:** `Company comparison`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For comparison queries between two companies (e.g., TCS and Infosys), decompose into separate sub-queries for each company's growth, margins, and analyst sentiment, but also include a sub-query for a combined analysis of both companies' growth and margins to provide a more comprehensive comparison.
+
+---
+
+### Lesson #92 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How does the current energy market outlook affect IEX and related NSE energy companies?
+
+**Category:** `energy market outlook and impact on NSE listed energy companies`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For energy market outlook queries related to specific NSE energy companies, decompose into a broader energy market outlook sub-query and a company-specific sub-query, rather than a compound query connecting two distinct topics.
+
+---
+
+### Lesson #93 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Analyze BEL and Zen Technologies in the context of India's defence spending trends and future opportunities.
+
+**Category:** `defence spending trend analysis involving specific companies`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For defence spending trend analysis queries involving specific companies, decompose into a macro topic query and a company-specific query, and use a bridge query to connect the two topics.
+
+---
+
+### Lesson #94 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Compare the likely winners and losers on NSE if RBI cuts rates twice over the next year.
+
+**Category:** `macro_rbi_rates`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macro_rbi_rates queries, the sub-query decomposition should be adjusted to focus on the impact of rate cuts on specific sectors and companies, rather than broad topics like 'RBI rate cut impact on Indian banking sector stock prices'.
+
+---
+
+### Lesson #95 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How is the India-US trade agreement expected to affect Indian IT companies over the next 12 months?
+
+**Category:** `trade_agreement_sector_impact`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries related to the impact of trade agreements on specific sectors, such as 'India-US trade agreement expected impact on Indian IT companies', consider using a more focused sub-query decomposition strategy, breaking down the query into smaller, more targeted sub-queries that directly address the missing information identified by the judge, e.g., 'trade agreement impact' and 'expected effect'.
+
+---
+
+### Lesson #96 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How is the India-US trade agreement expected to affect Indian IT companies over the next 12 months?
+
+**Category:** `trade_agreement_sector_impact`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries about the impact of trade agreements on specific sectors, decompose into a broad overview of the agreement and its expected effects, and a detailed analysis of the sector's fundamentals and performance.
+
+---
+
+### Lesson #97 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?
+
+**Category:** `macroeconomic impact analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic impact analysis queries, specifically those involving rate cuts and their effects on Indian sectors, consider decomposing into two separate sub-queries: one focusing on the rate cut's global impact and another on the sector-specific effects in India. This can help improve vector store retrieval and reduce the complexity of the compound query.
+
+---
+
+### Lesson #98 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Compare TCS and Infosys on growth, margins, and analyst sentiment, and identify which appears stronger today.
+
+**Category:** `growth comparison`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For growth comparison queries involving multiple companies, decompose into separate sub-queries for each company's growth analysis, and then use a different sub-query for the comparison, rather than a single compound query.
+
+---
+
+### Lesson #99 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How does the current energy market outlook affect IEX and related NSE energy companies?
+
+**Category:** `energy market outlook and NSE energy companies`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For energy market outlook queries related to specific NSE energy companies, decompose into a single query focusing on the company's energy market exposure and its impact on the company's performance.
+
+---
+
+### Lesson #100 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming India increases defence spending by 20% next year, which listed defence companies would benefit most and why?
+
+**Category:** `defence spending trend analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For defence spending trend analysis queries, decompose into separate sub-queries for 'defence spending trend analysis' and 'NSE listed defence companies' to improve vector store retrieval. Then, use a bridge query to connect the results and determine which companies would benefit most.
+
+---
+
+### Lesson #101 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Analyze TCS revenue growth, operating margins, and analyst outlook over the last year.
+
+**Category:** `financial_performance_and_outlook`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For financial performance and outlook queries about a specific company, decompose into sub-queries that focus on the company's financial statements and analyst reports, rather than broad topic-based sub-queries.
+
+---
+
+### Lesson #102 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI policy decisions and their impact on Indian banking stocks?
+
+**Category:** `RBI policy decisions and their impact on Indian banking stocks`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For RBI policy-related queries with a compound structure, consider using a more focused sub-query decomposition strategy, such as using a bridge query to directly retrieve RBI policy decisions and their impact on Indian banking stocks, rather than decomposing into separate sub-queries.
+
+---
+
+### Lesson #103 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What is the current Nifty 50 valuation relative to historical averages, and what are analysts expecting next?
+
+**Category:** `Nifty 50 valuation`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For Nifty 50 valuation queries, sub-query decomposition into three separate sub-queries ('Nifty 50 current valuation', 'Nifty 50 historical valuation averages', 'Nifty 50 analyst expectations') does not yield sufficient relevant information. Decompose into a single sub-query focused on Nifty 50 valuation and analysts' expectations.
+
+---
+
+### Lesson #104 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How are recent oil price movements affecting Reliance Industries and other energy-linked NSE stocks?
+
+**Category:** `energy-linked NSE stock queries`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For energy-linked NSE stock queries, decompose into sub-queries that focus on specific stocks and their direct relationships with oil price movements, rather than broad topics like 'oil price impact on NSE energy-linked stocks'.
+
+---
+
+### Lesson #105 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?What are Infosys's fundamentals, valuation, and analyst sentiment, and how do they compare with its historical averages?
+
+**Category:** `US Federal Reserve rate cut impact on Indian sectors`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries about the impact of US Federal Reserve rate cuts on Indian sectors, decompose into two separate sub-queries: one focused on the macroeconomic impact of rate cuts and another on the specific sectors likely to benefit.
+
+---
+
+### Lesson #106 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Analyze TCS revenue growth, operating margins, and analyst outlook over the last year.
+
+**Category:** `company_financial_metrics`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries about company-specific financial metrics (e.g., revenue growth, operating margins, analyst outlook), decompose into sub-queries that target specific financial statements (e.g., income statement, balance sheet, cash flow statement).
+
+---
+
+### Lesson #107 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI policy decisions and their impact on Indian banking stocks?
+
+**Category:** `RBI policy decisions and their impact on Indian banking stocks`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For RBI policy decisions and their impact on Indian banking stocks queries, the sub-query decomposition into three separate topics ('RBI latest policy decisions', 'Indian banking stocks fundamentals', 'RBI policy decisions impact on Indian banking sector stock prices') results in a low judge score due to missing information. Decompose into two topics: 'RBI policy decisions' and 'Indian banking stocks impact', and use a bridge query to combine both topics.
+
+---
+
+### Lesson #108 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** How is the India-US trade agreement expected to affect Indian IT companies over the next 12 months?
+
+**Category:** `trade_agreement_sector_impact`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries about the impact of trade agreements on specific sectors, decompose into sub-queries that focus on the agreement details and sector fundamentals separately, then combine the results.
+
+---
+
+### Lesson #109 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?What are Infosys's fundamentals, valuation, and analyst sentiment, and how do they compare with its historical averages?
+
+**Category:** `macroeconomic impact and sector analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic impact and sector analysis queries, decompose into sub-queries focusing on specific sectors (e.g., IT, manufacturing, agriculture) rather than broad categories (e.g., Indian sectors).
+
+---
+
+### Lesson #110 — 2026-07-04
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Analyze TCS revenue growth, operating margins, and analyst outlook over the last year.
+
+**Category:** `business_performance_analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For business performance analysis queries like 'TCS revenue growth, operating margins, and analyst outlook', decompose into a single sub-query that combines all aspects, rather than separate sub-queries for each.
+
+---
+
+### Lesson #111 — 2026-07-05
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?
+
+**Category:** `macroeconomic impact analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic impact analysis queries, specifically those involving rate cuts and sectoral analysis, decompose into two sub-queries: 'US Federal Reserve rate cut impact on Indian economy' and 'Indian sectors likely to benefit from rate cuts'. Then, use a compound query strategy to combine the results of these two sub-queries, focusing on the intersection of their topics.
+
+---
+
+### Lesson #112 — 2026-07-05
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?
+
+**Category:** `macroeconomic impact of rate cuts`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic impact queries involving rate cuts, decompose into two sub-queries: 'rate cut impact on economy' and 'sector-specific impact', rather than a single compound query.
+
+---
+
+### Lesson #113 — 2026-07-05
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?
+
+**Category:** `macroeconomic impact of rate cuts on specific sectors`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic impact queries involving rate cuts, decompose into a single sub-query focusing on the sector-level impact, rather than a compound query with multiple sub-queries.
+
+---
+
+### Lesson #114 — 2026-07-05
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?
+
+**Category:** `macroeconomic impact analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic impact analysis queries, specifically those involving rate cuts and their effects on Indian sectors, decompose into two separate sub-queries: one for the rate cut's impact on the Indian economy and another for identifying sectors likely to benefit. This will allow for more targeted and efficient retrieval from the vector store.
+
+---
+
+### Lesson #115 — 2026-07-05
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI rate decisions and impact on banking stocks?
+
+**Category:** `macro_rbi_rates`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macro_rbi_rates queries, the sub-query decomposition should be adjusted to focus on the latest RBI rate decisions and their direct impact on banking stocks, rather than tangentially related topics. Decompose into: 'latest RBI rate decisions', 'repo rate change', 'banking stock impact analysis'.
+
+---
+

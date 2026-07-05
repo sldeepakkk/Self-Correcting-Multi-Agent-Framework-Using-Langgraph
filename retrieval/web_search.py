@@ -18,7 +18,9 @@ MACRO_KEYWORDS = [
     "rbi", "reserve bank", "interest rate", "repo rate", "inflation",
     "gdp", "trade deal", "tariff", "policy", "budget", "fiscal",
     "monetary", "regulation", "government", "macro", "sector outlook",
-    "nifty", "sensex", "market valuation", "fii", "dii", "fpi"
+    "nifty", "sensex", "market valuation", "fii", "dii", "fpi",
+    "federal reserve", "fed ", "fomc", "rate cut", "rate hike",
+    "basis points", "central bank", "fed rate"
 ]
 
 
@@ -95,25 +97,44 @@ def search_web(sub_queries: list[str], max_results_per_query: int = 5) -> list[d
                     "sub_query": sub_query,
                     "category": category
                 })
-
+    print(f"[DEBUG] Sample titles: {[r['title'] for r in all_results[:5]]}")
     print(f"[WEB SEARCH] Retrieved {len(all_results)} raw results across {len(sub_queries)} sub-queries")
     return all_results
+    
+
 
 
 def _has_substantive_content(text: str) -> bool:
     """
     Checks for numbers AND financial terms — signals real data, not vague prose.
-    A passing refinement must contain at least one digit and one financial marker.
-    Catches "technically not empty but useless" refined content.
     """
     has_numbers = bool(re.search(r'\d', text))
     has_financial_terms = any(
         term in text.lower() for term in
         ['%', 'crore', 'lakh', '₹', 'rs.', 'usd', 'price', 'rate', 'target',
          'revenue', 'profit', 'growth', 'basis points', 'bps', 'q1', 'q2',
-         'q3', 'q4', 'fy2', 'fy26', 'fy25']
+         'q3', 'q4', 'fy2', 'fy26', 'fy25', 'gdp', 'inflation', 'fed',
+         'sector', 'index', 'nifty', 'sensex']
     )
     return has_numbers and has_financial_terms
+
+
+def _strip_inapplicable_sections(refined: str) -> str:
+    """
+    Removes individual sections flagged as NO_USEFUL_CONTENT rather than
+    rejecting the entire refinement. A macro query legitimately has no
+    Company Overview or Key Financials — that's expected, not a failure.
+    Only the genuinely empty sections are stripped; real content in other
+    sections is preserved.
+    """
+    import re as re_module
+    # Remove any section header immediately followed by the NO_USEFUL_CONTENT flag
+    cleaned = re_module.sub(
+        r'\*\*[^*]+\*\*\s*\nNO_USEFUL_CONTENT\n*',
+        '',
+        refined
+    )
+    return cleaned.strip()
 
 
 def knowledge_refine(
@@ -124,11 +145,9 @@ def knowledge_refine(
 ) -> tuple[str, bool]:
     """
     Strip noise from raw Tavily results and produce clean, structured context.
-
-    focus_items (optional): specific gaps identified by a previous judge pass
-    (e.g. ["concrete % impact on bank stock prices"]). When provided, the
-    refiner is instructed to prioritize content addressing these specific
-    gaps over general topic coverage. Used by the CRAG retry path.
+    Template adapts based on whether the query is company-specific or
+    macro/sector-level — this prevents forcing irrelevant sections that
+    then trigger false-positive rejection.
     """
 
     if not raw_results:
@@ -144,7 +163,7 @@ def knowledge_refine(
     if focus_items:
         formatted = "\n".join(f"- {item}" for item in focus_items)
         focus_block = f"""
-PRIORITY — A previous attempt was missing this specific information. 
+PRIORITY — A previous attempt was missing this specific information.
 Actively look for and prioritize anything in the sources below that addresses:
 {formatted}
 """
@@ -158,12 +177,21 @@ Rules:
 - Remove all navigation text, ads, cookie notices, unrelated content
 - Keep: financial figures, analyst opinions, revenue data, price targets, macro context
 - ALWAYS include specific numbers, dates, percentages where present in the sources
-- Structure output as: Company Overview | Key Financials | Analyst View | Recent Developments
+- If the query is about a SPECIFIC COMPANY, structure as:
+  Company Overview | Key Financials | Analyst View | Recent Developments
+- If the query is about a SECTOR, MACRO TREND, or MULTIPLE ENTITIES with no
+  single company focus, structure as:
+  Macro/Sector Context | Key Data Points | Market Reaction | Analyst Commentary
+- Only include sections that are relevant to the query type. Do NOT write
+  placeholder sections for a category that doesn't apply — simply omit them.
 - If a source contains nothing financially relevant, skip it entirely
 - Be concise — the output feeds a research generator, not a human reader
 - Prioritize sources with concrete figures over sources with only narrative/opinion
 
-If the results contain no useful financial information, respond with exactly: NO_USEFUL_CONTENT"""
+If NONE of the sources contain any useful financial or economic information at all,
+respond with exactly: NO_USEFUL_CONTENT
+(Only use this if the ENTIRE result set is irrelevant — not for individual
+sections that don't apply to this query type.)"""
 
     user_message = f"""Original Query: {query}
 Sub-queries searched: {sub_queries}
@@ -171,13 +199,9 @@ Sub-queries searched: {sub_queries}
 Raw Web Results:
 {raw_block}
 
-Extract and structure the financially relevant information. Prioritize concrete figures."""
+Extract and structure the financially relevant information. Prioritize concrete figures.
+Choose the appropriate template (company-specific or macro/sector) based on the query."""
 
-    # llm = ChatGroq(
-    #     api_key=GROQ_API_KEY,
-    #     model=JUDGE_MODEL,
-    #     temperature=0.0
-    # )
     llm = get_llm(JUDGE_MODEL, temperature=0.0)
 
     response = llm.invoke([
@@ -187,8 +211,17 @@ Extract and structure the financially relevant information. Prioritize concrete 
 
     refined = response.content.strip()
 
-    if "NO_USEFUL_CONTENT" in refined or len(refined) < 100:
-        print("[KNOWLEDGE REFINE] Failed — flagged as no useful content or too short")
+    # Only reject outright if the ENTIRE response is the flag, not if it
+    # merely appears somewhere inside an otherwise-useful structured response.
+    if refined.strip() == "NO_USEFUL_CONTENT" or len(refined) < 100:
+        print("[KNOWLEDGE REFINE] Failed — entire response flagged as no useful content or too short")
+        return refined, False
+
+    # Strip any individually-flagged inapplicable sections, keep the rest
+    refined = _strip_inapplicable_sections(refined)
+
+    if len(refined) < 100:
+        print("[KNOWLEDGE REFINE] Failed — after stripping inapplicable sections, nothing substantive remains")
         return refined, False
 
     if not _has_substantive_content(refined):
