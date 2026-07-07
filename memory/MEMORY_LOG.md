@@ -1707,3 +1707,108 @@ If the evidence is insufficient, state that no reliable directional conclusion c
 
 ---
 
+### Lesson #122 — 2026-07-07
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Assuming the US Federal Reserve cuts rates by 50 basis points, which Indian sectors are likely to benefit the most and why?
+
+**Category:** `macroeconomic impact analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macroeconomic impact analysis queries, specifically those involving the US Federal Reserve's rate decisions and their effects on Indian sectors, consider decomposing the query into two separate sub-queries: one focusing on the US Federal Reserve's rate decision and its global market impact, and another on the Indian sectors sensitive to interest rate changes. This will allow for more accurate and relevant information to be retrieved from the vector store.
+
+---
+
+### Lesson #123 — 2026-07-07
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI rate decisions and impact on banking stocks?
+
+**Category:** `macro_rbi_rates`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macro_rbi_rates queries, the sub-query decomposition into three distinct topics (rate decisions, banking stocks fundamentals, and rate decision impact) consistently results in low vector store scores. Consider decomposing into two topics: RBI rate decisions and their impact on banking stocks, and then use a bridge query to connect the two.
+
+---
+
+### Lesson #124 — 2026-07-07
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI rate decisions and impact on banking stocks?
+
+**Category:** `macro_rbi_rates`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For macro_rbi_rates queries, the sub-query decomposition should be revised to focus on the specific impact of RBI rate decisions on banking stocks, rather than decomposing into separate sub-queries for rate decisions and stock fundamentals.
+
+---
+
+### Lesson #125 — 2026-07-07
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** What are the latest RBI rate decisions and impact on banking stocks?
+
+**Category:** `RBI rate decision impact on banking stocks`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For RBI rate decision impact queries, decompose into sub-queries that focus on the rate decision itself and its direct impact on banking stocks, rather than trying to bridge two distinct topics.
+
+---
+
+### Lesson #126 — 2026-07-07
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** You are an evidence-driven analyst, not a prediction engine.
+
+Your task is to determine whether the market's reaction to today's biggest Indian stock market news is rational.
+
+Rules:
+
+Identify the single most market-moving news event from today.
+Explain why you selected it over other news.
+Identify every listed company that could reasonably be affected directly or indirectly.
+Collect relevant evidence including price movement, trading volume, sector performance, options activity (if available), corporate announcements, analyst commentary, and macroeconomic context.
+Construct two competing explanations for the market reaction.
+Explanation A: The reaction is fundamentally justified.
+Explanation B: The reaction is primarily driven by sentiment, speculation, liquidity, or short-term positioning.
+For each explanation:
+List supporting evidence.
+List contradicting evidence.
+Identify hidden assumptions.
+Estimate confidence.
+Attempt to disprove the explanation with the higher confidence by searching for additional evidence.
+If new evidence changes your conclusion, revise it and explain exactly what changed your mind.
+Produce a final verdict that clearly separates:
+Facts
+Reasonable inferences
+Assumptions
+Speculation
+Unknowns
+If the available evidence is insufficient or contradictory, explicitly state that no reliable conclusion can be reached instead of forcing one.
+
+Restrictions:
+
+Never invent missing data.
+Never assume causation from correlation without justification.
+Every conclusion must be traceable to evidence.
+If two sources disagree, explain why instead of choosing one without justification.
+Confidence must decrease when evidence conflicts.
+Your goal is not to sound confident; your goal is to be correct.
+
+**Category:** `market-moving news event analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For market-moving news event analysis, decompose the query into sub-queries that focus on identifying the single most significant news event, affected companies, and relevant evidence, and then construct competing explanations for the market reaction. Specifically, for this query category, break down the problem into sub-queries that focus on the news event, affected companies, and explanations for the market reaction, and ensure that each sub-query is analyzed independently before synthesizing the results.
+
+---
+

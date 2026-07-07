@@ -6,15 +6,15 @@
   },
   "cache_hit_rate_pct": 0.0,
   "avg_cache_hit_latency_ms": 0,
-  "avg_cache_miss_latency_ms": 14583,
+  "avg_cache_miss_latency_ms": 71979,
   "median_cache_hit_latency_ms": 0,
-  "median_cache_miss_latency_ms": 15762,
+  "median_cache_miss_latency_ms": 66702,
   "cache_speedup_x": 0,
   "crag_trigger_rate_pct": 40.0,
   "crag_recovery_rate_pct": 100.0,
-  "framework_avg_judge_score": 7.93,
-  "plain_llm_avg_judge_score": 6.0,
-  "framework_factual_grounding": 8.0,
-  "plain_llm_factual_grounding": 2.8,
-  "framework_wins_pct": 80.0
+  "framework_avg_judge_score": 6.7,
+  "plain_llm_avg_judge_score": 6.34,
+  "framework_factual_grounding": 6.2,
+  "plain_llm_factual_grounding": 5.0,
+  "framework_wins_pct": 60.0
 }

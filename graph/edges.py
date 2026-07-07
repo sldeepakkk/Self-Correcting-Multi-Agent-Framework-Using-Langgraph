@@ -188,7 +188,7 @@ def should_route_web_first(state: AgentState) -> str:
     print(f"[ROUTE] No web-first patterns → standard retrieval")
     return "retrieve"
 
-MAX_THESIS_REVISIONS = 1
+MAX_THESIS_REVISIONS = 2
 
 def route_after_thesis_critique(state: AgentState) -> str:
     """

@@ -20,3 +20,7 @@ memory/episodic.db
 
 # Benchmark outputs — keep the plots, skip raw JSON
 benchmarks/results/summary.json
+benchmarks/run_benchmark.py
+benchmarks/plain_llm.py
+benchmarks/results
+memory/MEMORY_LOG.md
