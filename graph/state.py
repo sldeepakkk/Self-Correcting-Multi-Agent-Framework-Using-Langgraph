@@ -63,3 +63,8 @@ class AgentState(TypedDict):
                                   # keys: topic_a, topic_b, factual_density,
                                   #       synthesis_ready, retry_focus
                                   # read by crag_retry_node for targeted search
+    thesis_revision_count: int
+    thesis_critique: dict
+    prev_thesis_critique: dict
+    critic_search_used: bool
+    premise_correction: str

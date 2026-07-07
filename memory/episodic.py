@@ -209,7 +209,7 @@ def _append_memory_log(
         f"---\n\n"
     )
 
-    with open(MEMORY_LOG_PATH, "a") as f:
+    with open(MEMORY_LOG_PATH, "a", encoding="utf-8") as f:
         f.write(entry)
 
     print(f"[MEMORY LOG] Appended lesson #{lesson_id} to MEMORY_LOG.md")

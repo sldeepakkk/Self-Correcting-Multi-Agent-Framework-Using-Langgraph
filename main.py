@@ -113,8 +113,8 @@ def run_query(query: str, verbose: bool = True) -> dict:
         "judge_score": 0.0,
         "judge_reasoning": "",
         "crag_triggered": False,
-        "is_compound_query": False,     # NEW
-        "judge_aspect_scores": {},      # NEW
+        "is_compound_query": False,     
+        "judge_aspect_scores": {},      
         "crag_retry_count": 0,
         "crag_missing_info": [],
         "web_search_results": [],
@@ -124,6 +124,10 @@ def run_query(query: str, verbose: bool = True) -> dict:
         "path_taken": "",
         "trace": [],
         "episodic_lessons": lessons,
+        "thesis_revision_count": 0,
+        "thesis_critique": {},
+        "critic_search_used": False,
+        "premise_correction": "",
         "cache_hit": False
     }
 

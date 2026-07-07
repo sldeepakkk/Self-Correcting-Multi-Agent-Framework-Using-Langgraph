@@ -1610,3 +1610,100 @@
 
 ---
 
+### Lesson #117 — 2026-07-05
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** "Screen all NSE-listed companies with a market capitalization above ₹10,000 crore that have delivered CAGR revenue growth above 15% and CAGR EPS growth above 18% over the last five financial years, while maintaining ROCE above 20% in each of the last three years and debt-to-equity below 0.5. Exclude banks, NBFCs, insurance companies, and newly listed companies with less than five years of financial history. Rank the remaining companies using a weighted score (40% earnings growth, 30% ROCE consistency, 20% operating cash flow growth, and 10% valuation discount relative to their 5-year median P/E). For the top 10, explain the key growth drivers, major risks, upcoming corporate events (results, dividends, splits, bonuses, or mergers), promoter holding trends, and whether the current valuation appears justified compared with industry peers. Finally, construct a diversified ₹10 lakh portfolio with position sizing based on volatility and maximum 25% sector exposure, and estimate expected annual return and downside under bull, base, and bear scenarios."
+
+**Category:** `financial_analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For financial analysis queries with multiple sub-queries, consider using a more hierarchical decomposition strategy, where each sub-query is further decomposed into smaller, more focused sub-queries that retrieve specific financial metrics, rather than a flat decomposition into multiple sub-queries that retrieve a wide range of metrics.
+
+---
+
+### Lesson #118 — 2026-07-05
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** "Find NSE stocks suitable for a long-term portfolio that have P/E below their 10-year median, revenue CAGR above 20% over five years, ROE above 18%, and debt-to-equity below 0.3. However, exclude any company whose stock has outperformed the NIFTY 500 by more than 50% over the last two years. Explain why each stock still qualifies despite the conflicting value and growth requirements."
+
+**Category:** `long-term portfolio queries with multiple financial criteria`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For long-term portfolio queries with multiple financial criteria, consider using a more granular sub-query decomposition strategy, such as breaking down the query into smaller, more focused sub-queries that target specific financial metrics (e.g., P/E ratio, revenue CAGR, ROE, debt-to-equity ratio) and then combining the results using a bridge query.
+
+---
+
+### Lesson #119 — 2026-07-05
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** Research whether India's semiconductor manufacturing ambitions are realistically achievable by 2030. Use government announcements, analyst reports, company statements, and international semiconductor industry research. Identify where sources disagree, explain why they disagree, distinguish between confirmed facts and optimistic projections, and conclude with your own evidence-weighted assessment.
+
+**Category:** `India's semiconductor manufacturing ambitions`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For queries related to India's semiconductor manufacturing ambitions, decompose into sub-queries that focus on specific government initiatives and international semiconductor industry research, rather than broad topics like 'global semiconductor industry trends and challenges'.
+
+---
+
+### Lesson #120 — 2026-07-06
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** "What is the exact quarterly EPS for Wipro for Q1, Q2, Q3, and Q4 of FY2026, and how does each quarter compare to the same quarter in FY2025? Also state the exact dividend payout ratio and free cash flow conversion for FY2026."
+
+**Category:** `financial_statements`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For financial statement queries requiring specific quarterly EPS figures and dividend payout ratios, decompose into sub-queries focusing on individual quarters (e.g., 'Wipro Q1 FY2026 EPS') rather than broad fiscal year queries.
+
+---
+
+### Lesson #121 — 2026-07-06
+**Status:** ACTIVE (confidence=0.80, threshold=0.75)
+
+**Query:** You are an autonomous market analyst. Your objective is not to predict the market, but to determine whether a prediction is even justified.
+
+Analyze today's NSE session using:
+
+Nifty and sector indices
+Options chain
+India VIX
+FII/DII flows
+Advance/decline ratio
+Delivery percentage
+Block and bulk deals
+Corporate announcements
+Relevant macro news
+
+Perform the following loop:
+
+Generate an initial market thesis.
+Search for evidence against it.
+Identify hidden assumptions.
+Revise the thesis.
+Repeat until no major contradictions remain or confidence stops improving.
+
+In the final answer:
+
+Separate facts from assumptions.
+Assign confidence to every major conclusion.
+Explicitly list what additional data would most change your view.
+If the evidence is insufficient, state that no reliable directional conclusion can be made instead of forcing a prediction.
+
+**Category:** `comprehensive market analysis`
+
+**Routing Recommendation:** `mixed`
+
+**Lesson:**
+> For comprehensive market analysis queries, prioritize sector indices and NSE session data over individual stock fundamentals. Decompose into: sector index analysis for market sentiment + NSE session data for overall market context.
+
+---
+

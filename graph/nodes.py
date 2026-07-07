@@ -409,7 +409,8 @@ def generator_node(state: AgentState) -> dict:
         query=state["query"],
         final_context=state.get("final_context", ""),
         sub_queries=state.get("sub_queries", []),            # INJECTED: Traceability from Planner
-        missing_info=state.get("crag_missing_info", []),     # INJECTED: Traceability from Judge retry
+        missing_info=state.get("crag_missing_info", []),
+        premise_correction=state.get("premise_correction", ""),     # INJECTED: Traceability from Judge retry
         crag_triggered=crag,
         recovery_succeeded=recovery,
         episodic_lessons=state.get("episodic_lessons", [])
@@ -428,6 +429,133 @@ def generator_node(state: AgentState) -> dict:
         }]
     }
 
+
+
+def thesis_critic_node(state: AgentState) -> dict:
+    """
+    Reasoning-loop critic — evaluates the GENERATOR'S OWN ARGUMENT, distinct
+    from the retrieval judge which only evaluates source material adequacy.
+    Skipped entirely for slow_failed — a refusal message has no thesis
+    to critique.
+    """
+    if state.get("path_taken") == "slow_failed":
+        return {
+            "thesis_critique": {"thesis_sound": True},
+            "trace": [{"node": "thesis_critic", "skipped": True, "reason": "slow_failed"}]
+        }
+
+    from agents.critic import run_thesis_critic
+    print(f"\n[NODE: THESIS CRITIC] Evaluating response argument...")
+
+    result = run_thesis_critic(
+        query=state["query"],
+        response=state.get("response", ""),
+        context=state.get("final_context", "")
+    )
+
+    print(f"[NODE: THESIS CRITIC] thesis_sound={result.thesis_sound}")
+    if not result.thesis_sound:
+        print(f"[NODE: THESIS CRITIC] premise_issues={result.premise_issues}")
+        print(f"[NODE: THESIS CRITIC] unsupported_claims={result.unsupported_claims}")
+        print(f"[NODE: THESIS CRITIC] overconfidence_flags={result.overconfidence_flags}")
+        print(f"[NODE: THESIS CRITIC] revision_instructions={result.revision_instructions}")
+
+    return {
+        "thesis_critique": result.dict(),
+        "prev_thesis_critique": state.get("thesis_critique", {}),
+        "trace": [{
+            "node": "thesis_critic",
+            "thesis_sound": result.thesis_sound,
+            "premise_issues": result.premise_issues,
+            "unsupported_claims": result.unsupported_claims,
+            "overconfidence_flags": result.overconfidence_flags
+        }]
+    }
+
+# ── Node : Revise ─────────────────────────────────────────────────────────
+def generator_revise_node(state: AgentState) -> dict:
+    from agents.generator import run_generator_revision
+    print(f"\n[NODE: GENERATOR REVISE] Revising based on critique...")
+
+    final_context = state.get("final_context", "")
+
+    # If critic_search just ran, flag that fresh evidence was appended so
+    # the revision prompt explicitly knows to use it, not just rephrase
+    # the same argument around unchanged context.
+    if state.get("critic_search_used", False) and "## Critic-Requested Evidence" in final_context:
+        print(f"[NODE: GENERATOR REVISE] Fresh critic-directed evidence present in context")
+
+    revised = run_generator_revision(
+        query=state["query"],
+        original_response=state.get("response", ""),
+        critique=state.get("thesis_critique", {}),
+        final_context=state.get("final_context", "")
+    )
+
+    new_count = state.get("thesis_revision_count", 0) + 1
+    print(f"[NODE: GENERATOR REVISE] Revision {new_count} complete, "
+          f"response={len(revised)} chars")
+
+    return {
+        "response": revised,
+        "thesis_revision_count": new_count,
+        "trace": [{"node": "generator_revise", "revision_count": new_count}]
+    }
+
+# ── Node : Revise search ─────────────────────────────────────────────────────────
+ 
+def critic_search_node(state: AgentState) -> dict:
+    """
+    Fires once when the critic flags a specific, searchable gap.
+    Fetches targeted evidence, then — same as the main CRAG path —
+    routes it through the aspect-based judge before trusting it as
+    usable evidence, rather than only checking the cheap pre-filter.
+    This closes the geography-mismatch gap using the same reasoning-
+    based verification the rest of the pipeline already relies on,
+    instead of a new keyword blocklist.
+    """
+    from retrieval.crag import run_critic_directed_search
+    from agents.judge import run_web_judge
+
+    critique = state.get("thesis_critique", {})
+    claim = critique.get("needs_evidence", "")
+
+    print(f"\n[NODE: CRITIC SEARCH] Fetching evidence: '{claim}'")
+
+    evidence, prefilter_passed = run_critic_directed_search(claim)
+    existing_context = state.get("final_context", "")
+
+    if not prefilter_passed or not evidence:
+        print(f"[NODE: CRITIC SEARCH] Pre-filter failed — no usable evidence")
+        return {
+            "final_context": existing_context,
+            "critic_search_used": True,
+            "trace": [{"node": "critic_search", "claim": claim,
+                       "evidence_found": False}]
+        }
+    judged = run_web_judge(query=state["query"], text=evidence, is_compound=False)
+
+    if judged.overall_score >= 0.5:
+        new_context = f"{existing_context}\n\n## Critic-Requested Evidence\n{evidence}"
+        print(f"[NODE: CRITIC SEARCH] Evidence judged relevant "
+              f"(score={judged.overall_score:.2f}) — appended")
+        found = True
+    else:
+        new_context = existing_context
+        print(f"[NODE: CRITIC SEARCH] Evidence judged irrelevant to original query "
+              f"(score={judged.overall_score:.2f}, likely off-topic/wrong entity) — discarded")
+        found = False
+
+    return {
+        "final_context": new_context,
+        "critic_search_used": True,
+        "trace": [{
+            "node": "critic_search",
+            "claim": claim,
+            "evidence_found": found,
+            "judge_score": judged.overall_score
+        }]
+    }
 
 # ── Node 9: Reflector ─────────────────────────────────────────────────────────
 
@@ -484,5 +612,33 @@ def reflector_node(state: AgentState) -> dict:
             "category": result.query_category,
             "confidence": result.confidence,
             "gate3_status": written["status"]
+        }]
+    }
+
+
+def premise_check_node(state: AgentState) -> dict:
+    """
+    Runs immediately after the planner, before retrieval or generation.
+    Cheap plain-text check for institutional/personnel misattribution —
+    catches cases like "SEBI, chaired by Shaktikanta Das" deterministically,
+    upstream of the fragile thesis critic. This is the structural fix:
+    premise correction no longer depends on a post-hoc JSON call succeeding.
+    """
+    from agents.critic import run_premise_check
+    print(f"\n[NODE: PREMISE CHECK] Screening query for institutional errors...")
+
+    result = run_premise_check(state["query"])
+
+    if result["premise_flag"]:
+        print(f"[NODE: PREMISE CHECK] Flagged: {result['premise_correction']}")
+    else:
+        print(f"[NODE: PREMISE CHECK] No institutional errors detected")
+
+    return {
+        "premise_correction": result["premise_correction"],
+        "trace": [{
+            "node": "premise_check",
+            "flagged": result["premise_flag"],
+            "correction": result["premise_correction"]
         }]
     }

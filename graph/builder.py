@@ -1,7 +1,8 @@
 from langgraph.graph import StateGraph, END
-from graph.edges import gate1_check, route_after_judge, route_after_crag_judge, gate2_check, should_route_web_first
+from graph.edges import gate1_check, route_after_judge, route_after_crag_judge, gate2_check, route_after_thesis_critique, should_route_web_first, route_after_thesis_critique
 from graph.state import AgentState
 from graph.nodes import (
+    generator_revise_node,
     planner_node,
     retriever_node,
     gate1_node,
@@ -11,6 +12,10 @@ from graph.nodes import (
     post_crag_judge_node,
     assemble_context_node,
     generator_node,
+    thesis_critic_node,
+    generator_revise_node,
+    critic_search_node,
+    premise_check_node,
     reflector_node
 )
 
@@ -48,16 +53,16 @@ def build_graph():
     graph.add_node("generator", generator_node)
     graph.add_node("reflector", reflector_node)
 
-    # fixed edges — always go here next
     graph.set_entry_point("planner")
+    graph.add_node("premise_check", premise_check_node)
+    graph.add_edge("planner", "premise_check")
+
     graph.add_conditional_edges(
-        "planner",
+        "premise_check",
         should_route_web_first,
-        {
-            "retrieve": "retriever",      # standard path
-            "web_first": "crag"           # skip retrieval entirely
-        }
+        {"retrieve": "retriever", "web_first": "crag"}
     )
+
     graph.add_edge("retriever", "gate1")
     graph.add_edge("crag", "post_crag_judge") 
     graph.add_edge("crag_retry", "post_crag_judge")
@@ -86,18 +91,24 @@ def build_graph():
         {"generator": "generator", "crag_retry": "crag_retry", "generator_partial": "generator"}
     )
 
-    graph.add_edge("assemble_context", "generator")
+    graph.add_node("critic_search", critic_search_node)
+    graph.add_edge("critic_search", "generator_revise")
+    graph.add_edge("reflector", END)
 
     graph.add_conditional_edges(
-        "generator",
-        gate2_check,
-        {
-            "reflector": "reflector",           # failure+recovery cycle
-            "end": END                          # clean run
-        }
+        "thesis_critic",
+        route_after_thesis_critique,
+        {"revise": "generator_revise", "critic_search": "critic_search", "reflector": "reflector", "end": END}
     )
 
-    graph.add_edge("reflector", END)
+    graph.add_edge("assemble_context", "generator")
+
+    graph.add_node("thesis_critic", thesis_critic_node)
+    graph.add_node("generator_revise", generator_revise_node)
+
+    graph.add_edge("generator", "thesis_critic")
+    graph.add_edge("generator_revise", "thesis_critic")
+
 
     return graph.compile()
 

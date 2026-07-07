@@ -15,18 +15,21 @@ PROVIDER = "groq"          # "groq" or "gemini" or "mixed" (planner/judge/reflec
 # ── Models ────────────────────────────────────────────────────────────────────
 if PROVIDER == "gemini":
     PLANNER_MODEL   = "gemini-2.5-flash"
+    CRITIC_MODEL    = "gemini-2.5-flash-preview-04-17"
     JUDGE_MODEL     = "gemini-2.5-flash"
     REFLECTOR_MODEL = "gemini-2.5-flash"
     GENERATOR_MODEL = "gemini-2.5-flash"
 
 elif PROVIDER == "mixed":
-    PLANNER_MODEL   = "llama-3.1-8b-instant"
-    JUDGE_MODEL     = "llama-3.1-8b-instant"
+    PLANNER_MODEL   = "llama-3.3-70b-versatile"
+    JUDGE_MODEL     = "llama-3.3-70b-versatile"
+    CRITIC_MODEL    = "llama-3.1-8b-instant"
     REFLECTOR_MODEL = "llama-3.1-8b-instant"
     GENERATOR_MODEL = "gemini-2.5-flash" 
 else:  # groq
-    PLANNER_MODEL   = "llama-3.1-8b-instant"
-    JUDGE_MODEL     = "llama-3.3-70b-versatile"
+    PLANNER_MODEL   = "llama-3.3-70b-versatile"
+    JUDGE_MODEL     = "llama-3.1-8b-instant"
+    CRITIC_MODEL    = "llama-3.1-8b-instant"
     REFLECTOR_MODEL = "llama-3.1-8b-instant"
     GENERATOR_MODEL = "llama-3.3-70b-versatile"
 

@@ -97,3 +97,27 @@ def run_crag_retry(
         print(f"[CRAG RETRY] Retry pre-filter failed")
 
     return refined_context, success
+
+def run_critic_directed_search(claim: str) -> tuple[str, bool]:
+    """
+    One-shot, critic-directed search — fetches evidence for a SPECIFIC
+    claim the thesis critic flagged in the already-generated response.
+    Distinct from run_crag_retry: that fixes initial retrieval quality
+    before generation; this fixes a named gap in the argument itself,
+    discovered only after the argument was written.
+    """
+    if not claim:
+        return "", False
+
+    print(f"[CRITIC SEARCH] Fetching evidence for: '{claim}'")
+    raw_results = search_web([claim], max_results_per_query=5)
+
+    if not raw_results:
+        return "", False
+
+    refined, success = knowledge_refine(
+        query=claim,
+        sub_queries=[claim],
+        raw_results=raw_results
+    )
+    return refined, success
