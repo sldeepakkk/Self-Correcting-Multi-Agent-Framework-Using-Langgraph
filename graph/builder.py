@@ -16,6 +16,7 @@ from graph.nodes import (
     generator_revise_node,
     critic_search_node,
     premise_check_node,
+    reasoning_reflector_node,
     reflector_node
 )
 
@@ -95,12 +96,6 @@ def build_graph():
     graph.add_edge("critic_search", "generator_revise")
     graph.add_edge("reflector", END)
 
-    graph.add_conditional_edges(
-        "thesis_critic",
-        route_after_thesis_critique,
-        {"revise": "generator_revise", "critic_search": "critic_search", "reflector": "reflector", "end": END}
-    )
-
     graph.add_edge("assemble_context", "generator")
 
     graph.add_node("thesis_critic", thesis_critic_node)
@@ -109,6 +104,19 @@ def build_graph():
     graph.add_edge("generator", "thesis_critic")
     graph.add_edge("generator_revise", "thesis_critic")
 
+    graph.add_node("reasoning_reflector", reasoning_reflector_node)
+
+    graph.add_conditional_edges(
+        "thesis_critic",
+        route_after_thesis_critique,
+        {"revise": "generator_revise", "critic_search": "critic_search", "reasoning_check": "reasoning_reflector"}
+    )
+
+    graph.add_conditional_edges(
+        "reasoning_reflector",
+        gate2_check,
+        {"reflector": "reflector", "end": END}
+    )
 
     return graph.compile()
 

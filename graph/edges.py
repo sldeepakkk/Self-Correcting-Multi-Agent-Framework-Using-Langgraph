@@ -187,40 +187,26 @@ def should_route_web_first(state: AgentState) -> str:
 
     print(f"[ROUTE] No web-first patterns → standard retrieval")
     return "retrieve"
-
+# ─────────────────────────────────────────────────
 MAX_THESIS_REVISIONS = 2
 
 def route_after_thesis_critique(state: AgentState) -> str:
-    """
-    Routes after the reasoning-critic evaluates the generator's own argument.
-    Convergence is checked BEFORE the hard cap, so if issues genuinely stop
-    shrinking, the loop exits early regardless of remaining budget. The cap
-    is now a true backstop, not the thing that always fires first.
-    """
     critique = state.get("thesis_critique", {})
     prev_critique = state.get("prev_thesis_critique", {})
     revision_count = state.get("thesis_revision_count", 0)
     search_used = state.get("critic_search_used", False)
 
     if prev_critique and has_converged(prev_critique, critique):
-        print("[ROUTE] Thesis converged — issue count stable or zero")
-        return gate2_check(state)
+        print("[ROUTE] Thesis converged")
+        return "reasoning_check"
 
     if revision_count >= MAX_THESIS_REVISIONS:
-        print(f"[ROUTE] Revision budget exhausted ({revision_count}/{MAX_THESIS_REVISIONS})")
-        return gate2_check(state)
+        print(f"[ROUTE] Revision budget exhausted")
+        return "reasoning_check"
 
     if not critique.get("thesis_sound", True):
-        # If the critic named a specific, searchable gap AND we haven't
-        # already used our one search shot this run, go fetch it first —
-        # gives the revision real new evidence instead of just rephrasing.
         if critique.get("needs_evidence") and not search_used:
-            print(f"[ROUTE] Critic flagged searchable gap: "
-                  f"'{critique['needs_evidence']}' → critic_search")
             return "critic_search"
-
-        print(f"[ROUTE] Revision {revision_count + 1}/{MAX_THESIS_REVISIONS}, "
-              f"targeting weakest dimension: {critique.get('weakest_dimension')}")
         return "revise"
 
-    return gate2_check(state)
+    return "reasoning_check"

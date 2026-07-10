@@ -34,6 +34,80 @@ def _get_connection() -> sqlite3.Connection:
     conn.commit()
     return conn
 
+# ── Reasoning Lessons ──────────────────────────────────
+REASONING_SCHEMA = """
+CREATE TABLE IF NOT EXISTS reasoning_lessons (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp           TEXT NOT NULL,
+    query               TEXT NOT NULL,
+    lesson              TEXT NOT NULL,
+    defect_category     TEXT NOT NULL,
+    applies_to          TEXT NOT NULL,
+    confidence          REAL NOT NULL,
+    active              INTEGER NOT NULL DEFAULT 1
+);
+"""
+
+_reasoning_embedder = None
+
+def _get_reasoning_embedder():
+    global _reasoning_embedder
+    if _reasoning_embedder is None:
+        from sentence_transformers import SentenceTransformer
+        from config import EMBEDDING_MODEL
+        _reasoning_embedder = SentenceTransformer(EMBEDDING_MODEL)
+    return _reasoning_embedder
+
+
+def _is_duplicate_reasoning_lesson(lesson_text: str, threshold: float = 0.9) -> bool:
+    """Cosine similarity dedup — reuses the same embedder already loaded
+    for the vector store/cache, no new dependency."""
+    import numpy as np
+    conn = _get_connection()
+    conn.execute(REASONING_SCHEMA)
+    rows = conn.execute("SELECT lesson FROM reasoning_lessons WHERE active = 1").fetchall()
+    conn.close()
+    if not rows:
+        return False
+    embedder = _get_reasoning_embedder()
+    new_emb = embedder.encode([lesson_text], normalize_embeddings=True)[0]
+    existing_embs = embedder.encode([r["lesson"] for r in rows], normalize_embeddings=True)
+    sims = existing_embs @ new_emb
+    return bool(np.max(sims) >= threshold)
+
+
+def write_reasoning_lesson(query: str, lesson: str, defect_category: str, applies_to: str, confidence: float) -> dict:
+    if _is_duplicate_reasoning_lesson(lesson):
+        print(f"[REASONING MEMORY] Duplicate lesson (sim >= 0.9) — skipped")
+        return {"active": 0, "status": "DUPLICATE_SKIPPED"}
+
+    active = 1 if confidence >= REFLECTION_CONFIDENCE_MIN else 0
+    conn = _get_connection()
+    conn.execute(REASONING_SCHEMA)
+    conn.execute(
+        """INSERT INTO reasoning_lessons
+           (timestamp, query, lesson, defect_category, applies_to, confidence, active)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (datetime.utcnow().isoformat(), query, lesson, defect_category, applies_to, confidence, active)
+    )
+    conn.commit()
+    conn.close()
+    status = "ACTIVE" if active else "QUARANTINED"
+    print(f"[REASONING MEMORY] Lesson written — confidence={confidence:.2f} → {status}")
+    return {"active": active, "status": status}
+
+
+def load_reasoning_lessons(limit: int = 8) -> list[str]:
+    """Recency-based for v1. Category column already present for a
+    later top-N-per-category upgrade without a schema migration."""
+    conn = _get_connection()
+    conn.execute(REASONING_SCHEMA)
+    rows = conn.execute(
+        "SELECT lesson, defect_category FROM reasoning_lessons "
+        "WHERE active = 1 ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [f"[{r['defect_category']}] {r['lesson']}" for r in rows]
 
 # ── Gate 3 — Write with confidence filtering ──────────────────────────────────
 

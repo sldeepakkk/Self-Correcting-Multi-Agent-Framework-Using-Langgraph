@@ -128,6 +128,7 @@ def run_query(query: str, verbose: bool = True) -> dict:
         "thesis_critique": {},
         "critic_search_used": False,
         "premise_correction": "",
+        "initial_reasoning_state": {},
         "cache_hit": False
     }
 

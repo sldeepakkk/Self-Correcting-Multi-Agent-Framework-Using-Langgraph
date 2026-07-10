@@ -24,3 +24,5 @@ benchmarks/run_benchmark.py
 benchmarks/plain_llm.py
 benchmarks/results
 memory/MEMORY_LOG.md
+
+app.py

@@ -68,3 +68,5 @@ class AgentState(TypedDict):
     prev_thesis_critique: dict
     critic_search_used: bool
     premise_correction: str
+
+    initial_reasoning_state: dict

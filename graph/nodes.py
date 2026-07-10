@@ -460,9 +460,23 @@ def thesis_critic_node(state: AgentState) -> dict:
         print(f"[NODE: THESIS CRITIC] overconfidence_flags={result.overconfidence_flags}")
         print(f"[NODE: THESIS CRITIC] revision_instructions={result.revision_instructions}")
 
+    initial_snapshot = state.get("initial_reasoning_state", {})
+    if not initial_snapshot:
+        # First critic pass this run — snapshot everything the reflector
+        # will need later, decoupled from the live critique schema.
+        initial_snapshot = {
+            "thesis_sound": result.thesis_sound,
+            "premise_issues": result.premise_issues,
+            "unsupported_claims": result.unsupported_claims,
+            "overconfidence_flags": result.overconfidence_flags,
+            "missing_requirements": result.missing_requirements,
+            "original_response": state.get("response", ""),
+        }
+
     return {
         "thesis_critique": result.dict(),
         "prev_thesis_critique": state.get("thesis_critique", {}),
+        "initial_reasoning_state": initial_snapshot,
         "trace": [{
             "node": "thesis_critic",
             "thesis_sound": result.thesis_sound,
@@ -640,5 +654,65 @@ def premise_check_node(state: AgentState) -> dict:
             "node": "premise_check",
             "flagged": result["premise_flag"],
             "correction": result["premise_correction"]
+        }]
+    }
+
+def reasoning_reflector_node(state: AgentState) -> dict:
+    """
+    Gate lives INSIDE this node (mirrors reasoning_gate2_check discussed
+    earlier, but implemented here to keep the graph edge simple — this
+    node always runs after thesis_critic terminates, and internally
+    decides whether a lesson is warranted).
+    """
+    from agents.reasoning_reflector import run_reasoning_reflector, compute_reasoning_confidence
+    from memory.episodic import write_reasoning_lesson
+
+    initial = state.get("initial_reasoning_state", {})
+    final_critique = state.get("thesis_critique", {})
+    revision_count = state.get("thesis_revision_count", 0)
+
+    if not initial:
+        return {"trace": [{"node": "reasoning_reflector", "status": "no_initial_critique"}]}
+
+    defect_found = (not initial.get("thesis_sound", True)) or bool(initial.get("unsupported_claims")) or bool(initial.get("overconfidence_flags"))
+    actually_revised = revision_count > 0
+    genuinely_resolved = final_critique.get("thesis_sound", False)
+
+    if not (defect_found and actually_revised and genuinely_resolved):
+        print(f"[NODE: REASONING REFLECTOR] Gate not met — skipping")
+        return {"trace": [{"node": "reasoning_reflector", "status": "gate_not_met"}]}
+
+    print(f"\n[NODE: REASONING REFLECTOR] Defect resolved — distilling lesson...")
+
+    result = run_reasoning_reflector(
+        query=state["query"],
+        original_response=initial.get("original_response", ""),
+        first_critique=initial,
+        revised_response=state.get("response", ""),
+        final_critique=final_critique
+    )
+
+    if result is None:
+        return {"trace": [{"node": "reasoning_reflector", "status": "parse_failed"}]}
+
+    confidence = compute_reasoning_confidence(
+        initial, final_critique,
+        critic_search_used=state.get("critic_search_used", False),
+        revision_count=revision_count
+    )
+
+    written = write_reasoning_lesson(
+        query=state["query"], lesson=result.lesson,
+        defect_category=result.defect_category,
+        applies_to=result.applies_to, confidence=confidence
+    )
+
+    return {
+        "trace": [{
+            "node": "reasoning_reflector",
+            "lesson": result.lesson,
+            "defect_category": result.defect_category,
+            "confidence": confidence,
+            "status": written.get("status")
         }]
     }
