@@ -6,7 +6,15 @@ from utils.llm_factory import get_llm
 from config import TAVILY_API_KEY, JUDGE_MODEL
 import json
 import re
+import sys
 from datetime import datetime
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 
 _tavily = TavilyClient(api_key=TAVILY_API_KEY)

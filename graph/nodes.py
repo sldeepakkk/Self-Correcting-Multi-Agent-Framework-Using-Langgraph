@@ -1,15 +1,12 @@
-from graph import state
 from graph.state import AgentState
 from agents.planner import run_planner
-from agents.judge import run_judge, run_judge_on_text, run_web_judge
-from agents.generator import run_generator
-from agents.reflector import run_reflector
+from agents.generator import run_generator, run_generator_revision, compute_evidence_confidence
+from agents.critic import run_thesis_critic, run_premise_check
+from agents.reasoning_reflector import run_reasoning_reflector, compute_reasoning_confidence
 from retrieval.vector_store import VectorStore
-from retrieval.crag import run_crag_fallback
-from memory.episodic import write_lesson
-from config import JUDGE_RELEVANCE_THRESHOLD
-from retrieval.crag import run_crag_fallback, run_crag_retry
-import uuid
+from retrieval.crag import run_evidence_search
+from retrieval.web_search import _has_substantive_content
+from memory.episodic import load_reasoning_lessons, write_reasoning_lesson
 
 # initialise once at import — loaded from disk, not rebuilt each call
 _vector_store = VectorStore()
@@ -18,21 +15,13 @@ _vector_store = VectorStore()
 # ── Node 1: Planner ───────────────────────────────────────────────────────────
 
 def planner_node(state: AgentState) -> dict:
-    """
-    Decomposes the raw query into 2-3 sub-queries.
-    Loads episodic lessons as priors — policy improvement manifests here.
-    Detects compound queries and logs is_compound flag to trace.
-    """
     print(f"\n[NODE: PLANNER] Query: {state['query'][:80]}...")
 
     lessons = state.get("episodic_lessons", [])
     if lessons:
         print(f"[NODE: PLANNER] Loaded {len(lessons)} episodic lessons as priors")
 
-    result = run_planner(
-        query=state["query"],
-        episodic_lessons=lessons
-    )
+    result = run_planner(query=state["query"], episodic_lessons=lessons)
 
     print(f"[NODE: PLANNER] Compound query: {result.is_compound}")
     print(f"[NODE: PLANNER] Sub-queries: {result.sub_queries}")
@@ -43,7 +32,6 @@ def planner_node(state: AgentState) -> dict:
         "is_compound_query": result.is_compound,
         "trace": [{
             "node": "planner",
-            "is_compound_query": result.is_compound,
             "sub_queries": result.sub_queries,
             "reasoning": result.reasoning,
             "is_compound": result.is_compound,
@@ -52,596 +40,13 @@ def planner_node(state: AgentState) -> dict:
     }
 
 
-# ── Node 2: Retriever ─────────────────────────────────────────────────────────
-
-def retriever_node(state: AgentState) -> dict:
-    """
-    Searches the FAISS vector store with each sub-query.
-    Merges and deduplicates results.
-    """
-    print(f"\n[NODE: RETRIEVER] Searching {len(state['sub_queries'])} sub-queries...")
-
-    docs = _vector_store.search_multi(
-        sub_queries=state["sub_queries"],
-        top_k_per_query=5
-    )
-
-    print(f"[NODE: RETRIEVER] Retrieved {len(docs)} unique documents")
-    for doc in docs:
-        print(f"  score={doc['score']:.4f} | {doc['source']}")
-
-    return {
-        "retrieved_docs": docs,
-        "trace": [{
-            "node": "retriever",
-            "doc_count": len(docs),
-            "sources": [d["source"] for d in docs],
-            "top_score": docs[0]["score"] if docs else 0.0
-        }]
-    }
-
-
-# ── Node 3: Gate 1 ────────────────────────────────────────────────────────────
-
-def gate1_node(state: AgentState) -> dict:
-    """
-    Cheap heuristic filter. Sets gate1_passed.
-    Routing decision is made in edges.py gate1_check().
-    """
-    docs = state.get("retrieved_docs", [])
-    top_score = docs[0].get("score", 0.0) if docs else 0.0
-    sources = [d.get("source", "") for d in docs]
-    unique_sources = len(set(sources))
-
-    passed = (
-        top_score >= 0.65 and
-        len(docs) >= 2 and
-        unique_sources >= 2
-    )
-
-    return {
-        "gate1_passed": passed,
-        "trace": [{
-            "node": "gate1",
-            "passed": passed,
-            "top_score": top_score,
-            "doc_count": len(docs),
-            "unique_sources": unique_sources
-        }]
-    }
-
-
-
-# ── Node 4: Judge ─────────────────────────────────────────────────────────────
-
-def judge_node(state: AgentState) -> dict:
-    """
-    Adversarial LLM evaluation of retrieved docs against the query.
-    Separate objective from generator. Score < threshold → CRAG.
-    """
-    print(f"\n[NODE: JUDGE] Evaluating {len(state['retrieved_docs'])} docs...")
-
-    result = run_judge(
-        query=state["query"],
-        retrieved_docs=state["retrieved_docs"][:3] # ONLY pass top 3
-    )
-
-    print(f"[NODE: JUDGE] Score: {result.score:.4f} | Verdict: {result.verdict}")
-    print(f"[NODE: JUDGE] Reasoning: {result.reasoning}")
-    if result.missing_information:
-        print(f"[NODE: JUDGE] Missing: {result.missing_information}")
-
-    return {
-        "judge_score": result.score,
-        "judge_reasoning": result.reasoning,
-        "trace": [{
-            "node": "judge",
-            "score": result.score,
-            "verdict": result.verdict,
-            "reasoning": result.reasoning,
-            "missing_information": result.missing_information
-        }]
-    }
-
-
-# ── Node 5: CRAG ──────────────────────────────────────────────────────────────
-
-def crag_node(state: AgentState) -> dict:
-    print(f"\n[NODE: CRAG] Fallback triggered — running web search...")
-
-    is_compound = state.get("is_compound_query", False)
-    retrieved_docs = state.get("retrieved_docs", [])
-
-    preserved_context = ""
-    if is_compound and retrieved_docs:
-        MIN_PRESERVE_SCORE = 0.30
-        preserved_docs = [d for d in retrieved_docs if d.get("score", 0.0) >= MIN_PRESERVE_SCORE]
-        if preserved_docs:
-            preserved_context = "\n\n".join([
-                f"[Vector Store — {d.get('source', 'unknown')}]\n{d.get('content', '')}"
-                for d in preserved_docs[:3]
-            ])
-
-    refined_context, prefilter_passed = run_crag_fallback(
-        query=state["query"],
-        sub_queries=state["sub_queries"],
-        judge_score=state.get("judge_score", 0.0)
-    )
-
-    # If the refiner itself flagged failure, do NOT trust refined_context's
-    # content even if preserved vector docs exist alongside it — but DO still
-    # allow preserved_context alone to go to the judge, since that's real
-    # vector store data, not refiner-flagged garbage.
-    if not prefilter_passed:
-        print(f"[NODE: CRAG] Refiner flagged failure — discarding web content, "
-              f"keeping only preserved vector context (if any)")
-        refined_context = ""   # discard the flagged-bad web content entirely
-
-    if preserved_context and refined_context:
-        combined_context = f"## Web Search Context\n{refined_context}\n\n## Vector Store Context\n{preserved_context}"
-    elif refined_context:
-        combined_context = refined_context
-    elif preserved_context:
-        combined_context = preserved_context
-    else:
-        combined_context = ""
-
-    return {
-        "final_context": combined_context,
-        "crag_triggered": True,
-        "web_search_results": [],
-        "trace": [{
-            "node": "crag",
-            "triggered": True,
-            "prefilter_passed": prefilter_passed,
-            "is_compound": is_compound,
-            "context_length": len(combined_context)
-        }]
-    }
-
-def post_crag_judge_node(state: AgentState) -> dict:
-    """
-    Aspect-based evaluation of CRAG-refined web context.
-    Uses synthesis-aware rubric — evaluates raw ingredients for synthesis,
-    not whether any single source already answers the query.
-    Stores structured aspect scores in state for targeted retry.
-    """
-    from agents.judge import run_web_judge
-
-    print(f"\n[NODE: POST-CRAG JUDGE] Aspect-based evaluation of web context...")
-
-    refined_context = state.get("final_context", "")
-    is_compound = state.get("is_compound_query", False)
-
-    if not refined_context:
-        print("[NODE: POST-CRAG JUDGE] No refined context to judge — auto-fail")
-        # Use the planner's existing decomposed sub_queries as retry material,
-        # not the raw original query — sub_queries are already properly atomic.
-        fallback_retry = state.get("sub_queries", [state.get("query", "")])[:3]
-        fail_aspect = {"score": 0.0, "present": False, "gap": "no content"}
-        return {
-            "recovery_succeeded": False,
-            "judge_score": 0.0,
-            "judge_aspect_scores": {
-            "topic_a": fail_aspect,
-            "topic_b": fail_aspect,
-            "factual_density": fail_aspect,
-            "synthesis_ready": False,
-            "retry_focus": fallback_retry
-        },
-        "crag_missing_info": fallback_retry,
-        "trace": [{"node": "post_crag_judge", "score": 0.0,
-                   "verdict": "FAIL", "reasoning": "No content"}]
-    }
-
-    result = run_web_judge(
-        query=state["query"],
-        text=refined_context,
-        is_compound=is_compound
-    )
-
-    print(f"[NODE: POST-CRAG JUDGE] topic_a={result.topic_a.score:.2f} "
-          f"topic_b={result.topic_b.score:.2f} "
-          f"factual={result.factual_density.score:.2f}")
-    print(f"[NODE: POST-CRAG JUDGE] synthesis_ready={result.synthesis_ready} "
-          f"| overall={result.overall_score:.2f}")
-
-    if not result.synthesis_ready:
-        gaps = []
-        if not result.topic_a.present:
-            gaps.append(f"topic_a: {result.topic_a.gap}")
-        if not result.topic_b.present:
-            gaps.append(f"topic_b: {result.topic_b.gap}")
-        if not result.factual_density.present:
-            gaps.append(f"factual: {result.factual_density.gap}")
-        print(f"[NODE: POST-CRAG JUDGE] Gaps: {gaps}")
-        print(f"[NODE: POST-CRAG JUDGE] Retry focus: {result.retry_focus}")
-
-    aspect_scores = {
-        "topic_a": result.topic_a.dict(),
-        "topic_b": result.topic_b.dict(),
-        "factual_density": result.factual_density.dict(),
-        "synthesis_ready": result.synthesis_ready,
-        "retry_focus": result.retry_focus
-    }
-
-    return {
-        "recovery_succeeded": result.synthesis_ready,
-        "judge_score": result.overall_score,
-        "judge_aspect_scores": aspect_scores,
-        "crag_missing_info": result.retry_focus,
-        "trace": [{
-            "node": "post_crag_judge",
-            "score": result.overall_score,
-            "verdict": result.verdict,
-            "synthesis_ready": result.synthesis_ready,
-            "topic_a_score": result.topic_a.score,
-            "topic_b_score": result.topic_b.score,
-            "factual_density_score": result.factual_density.score,
-            "retry_focus": result.retry_focus
-        }]
-    }
-
-
-# ── Node 7: Assemble Context (medium path) ────────────────────────────────────
-
-def assemble_context_node(state: AgentState) -> dict:
-    """
-    Assembles final_context from vector store docs on clean path.
-    Generator always reads from final_context regardless of path.
-    """
-    docs = state.get("retrieved_docs", [])
-    context = "\n\n".join([
-        f"[Source: {d.get('source', 'unknown')}]\n{d.get('content', '')}"
-        for d in docs
-    ])
-
-    return {
-        "final_context": context,
-        "crag_triggered": False,
-        "trace": [{
-            "node": "assemble_context",
-            "source": "vector_store",
-            "doc_count": len(docs),
-            "context_length": len(context)
-        }]
-    }
-
-def crag_retry_node(state: AgentState) -> dict:
-    """
-    Corrective retry using aspect-based feedback.
-    retry_focus comes from the web judge's structured aspect evaluation.
-
-    If web retry fails, explicitly preserves the existing final_context
-    (which may contain hybrid vector store content from crag_node) rather
-    than overwriting it with an empty string. This makes the fallback
-    path explicit and traceable instead of accidental.
-    """
-    print(f"\n[NODE: CRAG RETRY] Targeted retry using aspect-based feedback...")
-
-    aspect_scores = state.get("judge_aspect_scores", {})
-    retry_focus = aspect_scores.get("retry_focus", [])
-
-    if not retry_focus:
-        retry_focus = state.get("crag_missing_info", [state.get("query", "")])
-
-    print(f"[NODE: CRAG RETRY] Retry queries from aspect feedback: {retry_focus}")
-
-    refined_context, prefilter_passed = run_crag_retry(
-        query=state["query"],
-        missing_information=retry_focus
-    )
-
-    if prefilter_passed and refined_context:
-        # Web retry succeeded — use fresh web context
-        final_context = refined_context
-        context_source = "web_retry"
-        print(f"[NODE: CRAG RETRY] Web retry succeeded — "
-              f"{len(refined_context)} chars of fresh context")
-    else:
-        # Web retry failed — explicitly preserve whatever is already in state
-        # This is typically the hybrid context (preserved vector docs) that
-        # crag_node assembled. Overwriting with empty would lose that content.
-        final_context = state.get("final_context", "")
-        context_source = "preserved_from_crag_node"
-        if final_context:
-            print(f"[NODE: CRAG RETRY] Web retry failed — preserving existing "
-                  f"context ({len(final_context)} chars) from crag_node for judge")
-        else:
-            print(f"[NODE: CRAG RETRY] Web retry failed — no existing context "
-                  f"to fall back to, final fallback will be insufficient-data response")
-
-    return {
-        "final_context": final_context,
-        "crag_retry_count": state.get("crag_retry_count", 0) + 1,
-        "trace": [{
-            "node": "crag_retry",
-            "retry_queries": retry_focus,
-            "prefilter_passed": prefilter_passed,
-            "context_source": context_source,
-            "context_length": len(final_context)
-        }]
-    }
-
-
-# ── Node 8: Generator ─────────────────────────────────────────────────────────
-
-def generator_node(state: AgentState) -> dict:
-    """
-    Synthesizes the final research report from verified context.
-    Handles all three path outcomes: clean, CRAG success, CRAG failure.
-    CRAG failure returns calibrated insufficient-data response.
-    """
-    print(f"\n[NODE: GENERATOR] Synthesizing report...")
-    print(f"  CRAG triggered: {state.get('crag_triggered', False)}")
-    print(f"  Recovery succeeded: {state.get('recovery_succeeded', False)}")
-    print(f"  Context length: {len(state.get('final_context', ''))} chars")
-
-    crag = state.get("crag_triggered", False)
-    recovery = state.get("recovery_succeeded", False)
-    judge_score = state.get("judge_score", 0.0)
-
-    # Partial case: retry exhausted, score close to threshold with strong core aspects
-    is_partial = (crag and not recovery and judge_score >= 0.65 and
-                  state.get("crag_retry_count", 0) >= 1)
-
-    # Fast-fail short-circuit: Do not invoke the 70B model if context is dead
-    if crag and not recovery and not is_partial:
-        path = "slow_failed"
-        response = "## Research Report — Insufficient Data\n\n**Status:** This query requires current information that could not be retrieved reliably. The vector store did not contain relevant documents, and web search did not return financially usable content.\n\n**Confidence:** Low — no synthesis attempted to avoid hallucination."
-        
-        print(f"[NODE: GENERATOR] Done — path={path} (Fast-Fail)")
-        return {
-            "response": response,
-            "path_taken": path,
-            "trace": [{
-                "node": "generator",
-                "path": path,
-                "response_length": len(response),
-                "context_source": "insufficient"
-            }]
-        }
-
-    # Clean path or successful CRAG recovery
-    path = "slow" if crag else "medium"
-    
-    response = run_generator(
-        query=state["query"],
-        final_context=state.get("final_context", ""),
-        sub_queries=state.get("sub_queries", []),            # INJECTED: Traceability from Planner
-        missing_info=state.get("crag_missing_info", []),
-        premise_correction=state.get("premise_correction", ""),     # INJECTED: Traceability from Judge retry
-        crag_triggered=crag,
-        recovery_succeeded=recovery,
-        episodic_lessons=state.get("episodic_lessons", [])
-    )
-
-    print(f"[NODE: GENERATOR] Done — path={path}, response={len(response)} chars")
-
-    return {
-        "response": response,
-        "path_taken": path,
-        "trace": [{
-            "node": "generator",
-            "path": path,
-            "response_length": len(response),
-            "context_source": "web" if crag else "vector_store"
-        }]
-    }
-
-
-
-def thesis_critic_node(state: AgentState) -> dict:
-    """
-    Reasoning-loop critic — evaluates the GENERATOR'S OWN ARGUMENT, distinct
-    from the retrieval judge which only evaluates source material adequacy.
-    Skipped entirely for slow_failed — a refusal message has no thesis
-    to critique.
-    """
-    if state.get("path_taken") == "slow_failed":
-        return {
-            "thesis_critique": {"thesis_sound": True},
-            "trace": [{"node": "thesis_critic", "skipped": True, "reason": "slow_failed"}]
-        }
-
-    from agents.critic import run_thesis_critic
-    print(f"\n[NODE: THESIS CRITIC] Evaluating response argument...")
-
-    result = run_thesis_critic(
-        query=state["query"],
-        response=state.get("response", ""),
-        context=state.get("final_context", "")
-    )
-
-    print(f"[NODE: THESIS CRITIC] thesis_sound={result.thesis_sound}")
-    if not result.thesis_sound:
-        print(f"[NODE: THESIS CRITIC] premise_issues={result.premise_issues}")
-        print(f"[NODE: THESIS CRITIC] unsupported_claims={result.unsupported_claims}")
-        print(f"[NODE: THESIS CRITIC] overconfidence_flags={result.overconfidence_flags}")
-        print(f"[NODE: THESIS CRITIC] revision_instructions={result.revision_instructions}")
-
-    initial_snapshot = state.get("initial_reasoning_state", {})
-    if not initial_snapshot:
-        # First critic pass this run — snapshot everything the reflector
-        # will need later, decoupled from the live critique schema.
-        initial_snapshot = {
-            "thesis_sound": result.thesis_sound,
-            "premise_issues": result.premise_issues,
-            "unsupported_claims": result.unsupported_claims,
-            "overconfidence_flags": result.overconfidence_flags,
-            "missing_requirements": result.missing_requirements,
-            "original_response": state.get("response", ""),
-        }
-
-    return {
-        "thesis_critique": result.dict(),
-        "prev_thesis_critique": state.get("thesis_critique", {}),
-        "initial_reasoning_state": initial_snapshot,
-        "trace": [{
-            "node": "thesis_critic",
-            "thesis_sound": result.thesis_sound,
-            "premise_issues": result.premise_issues,
-            "unsupported_claims": result.unsupported_claims,
-            "overconfidence_flags": result.overconfidence_flags
-        }]
-    }
-
-# ── Node : Revise ─────────────────────────────────────────────────────────
-def generator_revise_node(state: AgentState) -> dict:
-    from agents.generator import run_generator_revision
-    print(f"\n[NODE: GENERATOR REVISE] Revising based on critique...")
-
-    final_context = state.get("final_context", "")
-
-    # If critic_search just ran, flag that fresh evidence was appended so
-    # the revision prompt explicitly knows to use it, not just rephrase
-    # the same argument around unchanged context.
-    if state.get("critic_search_used", False) and "## Critic-Requested Evidence" in final_context:
-        print(f"[NODE: GENERATOR REVISE] Fresh critic-directed evidence present in context")
-
-    revised = run_generator_revision(
-        query=state["query"],
-        original_response=state.get("response", ""),
-        critique=state.get("thesis_critique", {}),
-        final_context=state.get("final_context", "")
-    )
-
-    new_count = state.get("thesis_revision_count", 0) + 1
-    print(f"[NODE: GENERATOR REVISE] Revision {new_count} complete, "
-          f"response={len(revised)} chars")
-
-    return {
-        "response": revised,
-        "thesis_revision_count": new_count,
-        "trace": [{"node": "generator_revise", "revision_count": new_count}]
-    }
-
-# ── Node : Revise search ─────────────────────────────────────────────────────────
- 
-def critic_search_node(state: AgentState) -> dict:
-    """
-    Fires once when the critic flags a specific, searchable gap.
-    Fetches targeted evidence, then — same as the main CRAG path —
-    routes it through the aspect-based judge before trusting it as
-    usable evidence, rather than only checking the cheap pre-filter.
-    This closes the geography-mismatch gap using the same reasoning-
-    based verification the rest of the pipeline already relies on,
-    instead of a new keyword blocklist.
-    """
-    from retrieval.crag import run_critic_directed_search
-    from agents.judge import run_web_judge
-
-    critique = state.get("thesis_critique", {})
-    claim = critique.get("needs_evidence", "")
-
-    print(f"\n[NODE: CRITIC SEARCH] Fetching evidence: '{claim}'")
-
-    evidence, prefilter_passed = run_critic_directed_search(claim)
-    existing_context = state.get("final_context", "")
-
-    if not prefilter_passed or not evidence:
-        print(f"[NODE: CRITIC SEARCH] Pre-filter failed — no usable evidence")
-        return {
-            "final_context": existing_context,
-            "critic_search_used": True,
-            "trace": [{"node": "critic_search", "claim": claim,
-                       "evidence_found": False}]
-        }
-    judged = run_web_judge(query=state["query"], text=evidence, is_compound=False)
-
-    if judged.overall_score >= 0.5:
-        new_context = f"{existing_context}\n\n## Critic-Requested Evidence\n{evidence}"
-        print(f"[NODE: CRITIC SEARCH] Evidence judged relevant "
-              f"(score={judged.overall_score:.2f}) — appended")
-        found = True
-    else:
-        new_context = existing_context
-        print(f"[NODE: CRITIC SEARCH] Evidence judged irrelevant to original query "
-              f"(score={judged.overall_score:.2f}, likely off-topic/wrong entity) — discarded")
-        found = False
-
-    return {
-        "final_context": new_context,
-        "critic_search_used": True,
-        "trace": [{
-            "node": "critic_search",
-            "claim": claim,
-            "evidence_found": found,
-            "judge_score": judged.overall_score
-        }]
-    }
-
-# ── Node 9: Reflector ─────────────────────────────────────────────────────────
-
-def reflector_node(state: AgentState) -> dict:
-    """
-    Reads the full execution trace and produces one compressed policy lesson.
-    Gate 3 lives in episodic.write_lesson() — confidence filter applied there.
-    Only called when Gate 2 fires: crag_triggered AND recovery_succeeded.
-
-    If run_reflector returns None (parse failure after retries), the lesson
-    write is skipped entirely — no fabricated lesson enters episodic memory.
-    """
-    print(f"\n[NODE: REFLECTOR] Distilling lesson from trace...")
-
-    run_id = str(uuid.uuid4())[:8]
-
-    result = run_reflector(
-        query=state["query"],
-        sub_queries=state.get("sub_queries", []),
-        trace=state.get("trace", []),
-        judge_score=state.get("judge_score", 0.0),
-        recovery_succeeded=state.get("recovery_succeeded", False)
-    )
-
-    if result is None:
-        print(f"[NODE: REFLECTOR] No lesson written — reflector failed to produce valid output")
-        return {
-            "trace": [{
-                "node": "reflector",
-                "run_id": run_id,
-                "status": "skipped_parse_failure"
-            }]
-        }
-
-    print(f"[NODE: REFLECTOR] Category: {result.query_category}")
-    print(f"[NODE: REFLECTOR] Confidence: {result.confidence:.2f}")
-    print(f"[NODE: REFLECTOR] Lesson: {result.lesson}")
-    print(f"[NODE: REFLECTOR] Routing rec: {result.routing_recommendation}")
-
-    written = write_lesson(
-        query=state["query"],
-        query_category=result.query_category,
-        lesson=result.lesson,
-        confidence=result.confidence,
-        routing_recommendation=result.routing_recommendation,
-        run_id=run_id
-    )
-
-    return {
-        "trace": [{
-            "node": "reflector",
-            "run_id": run_id,
-            "lesson": result.lesson,
-            "category": result.query_category,
-            "confidence": result.confidence,
-            "gate3_status": written["status"]
-        }]
-    }
-
+# ── Node 2: Premise Check ─────────────────────────────────────────────────────
 
 def premise_check_node(state: AgentState) -> dict:
-    """
-    Runs immediately after the planner, before retrieval or generation.
-    Cheap plain-text check for institutional/personnel misattribution —
-    catches cases like "SEBI, chaired by Shaktikanta Das" deterministically,
-    upstream of the fragile thesis critic. This is the structural fix:
-    premise correction no longer depends on a post-hoc JSON call succeeding.
-    """
-    from agents.critic import run_premise_check
     print(f"\n[NODE: PREMISE CHECK] Screening query for institutional errors...")
 
-    result = run_premise_check(state["query"])
+    reasoning_lessons = load_reasoning_lessons(limit=5)
+    result = run_premise_check(state["query"], reasoning_lessons=reasoning_lessons)
 
     if result["premise_flag"]:
         print(f"[NODE: PREMISE CHECK] Flagged: {result['premise_correction']}")
@@ -657,16 +62,227 @@ def premise_check_node(state: AgentState) -> dict:
         }]
     }
 
-def reasoning_reflector_node(state: AgentState) -> dict:
-    """
-    Gate lives INSIDE this node (mirrors reasoning_gate2_check discussed
-    earlier, but implemented here to keep the graph edge simple — this
-    node always runs after thesis_critic terminates, and internally
-    decides whether a lesson is warranted).
-    """
-    from agents.reasoning_reflector import run_reasoning_reflector, compute_reasoning_confidence
-    from memory.episodic import write_reasoning_lesson
 
+# ── Node 3: Retriever ─────────────────────────────────────────────────────────
+
+def retriever_node(state: AgentState) -> dict:
+    """
+    Hybrid retriever: searches internal vector store for company filings and
+    domain documents, and augments with real-time web search when local context
+    is insufficient or when the query requires recent/live market data.
+    """
+    sub_queries = state.get("sub_queries", []) or [state["query"]]
+    print(f"\n[NODE: RETRIEVER] Searching {len(sub_queries)} sub-queries...")
+
+    docs = _vector_store.search_multi(sub_queries=sub_queries, top_k_per_query=4)
+    high_quality_docs = [d for d in docs if d.get("score", 0.0) >= 0.58]
+
+    context_parts = []
+    if high_quality_docs:
+        local_context = "\n\n".join(
+            f"[Source: {d.get('source', 'internal_filing')}]\n{d.get('content', '')}"
+            for d in high_quality_docs
+        )
+        context_parts.append(local_context)
+        print(f"[NODE: RETRIEVER] Found {len(high_quality_docs)} high-relevance local docs")
+    else:
+        print(f"[NODE: RETRIEVER] Local vector store has sparse context for this query")
+
+    # Check if local context is rich and contains substantive financial figures
+    top_score = max((d.get("score", 0.0) for d in high_quality_docs), default=0.0)
+    has_substantive_local = bool(context_parts) and _has_substantive_content(context_parts[0])
+
+    web_searched = False
+    # Augment with live web search if local context is sparse, lacks substantive financial data, or has low match score
+    if len(high_quality_docs) < 3 or not has_substantive_local or top_score < 0.70:
+        print(f"[NODE: RETRIEVER] Local context insufficient (docs={len(high_quality_docs)}, top_score={top_score:.2f}, substantive={has_substantive_local}). Augmenting with live web search...")
+        refined, success = run_evidence_search(state["query"], sub_queries)
+        if success and refined:
+            context_parts.append(f"## Live Market & Research Context\n{refined}")
+            web_searched = True
+            print(f"[NODE: RETRIEVER] Web search added {len(refined)} chars of structured evidence")
+
+    combined_context = "\n\n".join(context_parts) if context_parts else "\n\n".join(
+        f"[Source: {d.get('source', 'unknown')}]\n{d.get('content', '')}" for d in docs
+    )
+
+    print(f"[NODE: RETRIEVER] Total context: {len(combined_context)} chars (web_augmented={web_searched})")
+
+    return {
+        "final_context": combined_context,
+        "search_count": 1 if web_searched else 0,
+        "trace": [{
+            "node": "retriever",
+            "doc_count": len(high_quality_docs),
+            "web_augmented": web_searched,
+            "context_length": len(combined_context)
+        }]
+    }
+
+
+# ── Node 4: Generator ─────────────────────────────────────────────────────────
+
+def generator_node(state: AgentState) -> dict:
+    print(f"\n[NODE: GENERATOR] Synthesizing answer...")
+    print(f"  Context length: {len(state.get('final_context', ''))} chars")
+
+    confidence = compute_evidence_confidence(state)
+    print(f"[NODE: GENERATOR] Evidence confidence: {confidence}")
+
+    response = run_generator(
+        query=state["query"],
+        final_context=state.get("final_context", ""),
+        sub_queries=state.get("sub_queries", []),
+        premise_correction=state.get("premise_correction", ""),
+        evidence_confidence=confidence,
+        episodic_lessons=state.get("episodic_lessons", [])
+    )
+
+    path = "low_confidence" if confidence == "low" else "generated"
+    print(f"[NODE: GENERATOR] Done — path={path}, response={len(response)} chars")
+
+    return {
+        "response": response,
+        "path_taken": path,
+        "evidence_confidence": confidence,
+        "trace": [{
+            "node": "generator",
+            "path": path,
+            "evidence_confidence": confidence,
+            "response_length": len(response)
+        }]
+    }
+
+
+# ── Node 5: Thesis Critic ─────────────────────────────────────────────────────
+
+def thesis_critic_node(state: AgentState) -> dict:
+    """
+    ONE evaluation step of the critic — produces a ThesisCritique and stores it
+    in state. Routing after this node (evidence_search / revise / reasoning_check)
+    is handled by route_after_thesis_critique in edges.py as a real LangGraph
+    conditional edge, so each loop iteration is visible to LangGraph's
+    checkpointing and observability rather than hidden inside a Python for-loop.
+    """
+    print(f"\n[NODE: THESIS CRITIC] Evaluating response (revision={state.get('thesis_revision_count', 0)})...")
+
+    reasoning_lessons = load_reasoning_lessons(limit=5)
+    critique = run_thesis_critic(
+        query=state["query"],
+        response=state.get("response", ""),
+        context=state.get("final_context", ""),
+        is_compound=state.get("is_compound_query", False),
+        evidence_confidence=state.get("evidence_confidence", "medium"),
+        reasoning_lessons=reasoning_lessons
+    )
+
+    print(f"[NODE: THESIS CRITIC] Sound={critique.thesis_sound}, "
+          f"needs_evidence={bool(critique.needs_evidence)}, "
+          f"weakest={critique.weakest_dimension}")
+
+    # Snapshot current critique as prev before overwriting, so the convergence
+    # check in route_after_thesis_critique can compare adjacent iterations.
+    prev_critique = state.get("thesis_critique", {})
+    critique_dict = critique.model_dump()
+
+    # Capture initial state only on the very first critic pass so the reasoning
+    # reflector can compare before-vs-after across the full revision loop.
+    updates: dict = {
+        "thesis_critique": critique_dict,
+        "prev_thesis_critique": prev_critique,
+        "trace": [{
+            "node": "thesis_critic",
+            "revision_pass": state.get("thesis_revision_count", 0),
+            "thesis_sound": critique.thesis_sound,
+            "needs_evidence": critique.needs_evidence,
+            "weakest_dimension": critique.weakest_dimension
+        }]
+    }
+
+    if not state.get("initial_reasoning_state"):
+        updates["initial_reasoning_state"] = {
+            "thesis_sound": critique.thesis_sound,
+            "original_response": state.get("response", ""),
+            "unsupported_claims": critique.unsupported_claims,
+            "overconfidence_flags": critique.overconfidence_flags,
+            "premise_issues": critique.premise_issues,
+            "revision_count_signal": 0
+        }
+
+    return updates
+
+
+# ── Node 6: Evidence Search (critic-directed) ─────────────────────────────────
+
+def evidence_search_node(state: AgentState) -> dict:
+    """
+    Fetches one targeted web search based on the critic's needs_evidence field.
+    Appends results to final_context so the subsequent revise_node and the next
+    thesis_critic pass both see the new evidence. Increments search_count so
+    route_after_thesis_critique can enforce the MAX_SEARCHES cap.
+    """
+    critique = state.get("thesis_critique", {})
+    search_query = critique.get("needs_evidence") or state["query"]
+
+    print(f"\n[NODE: EVIDENCE SEARCH] Critic-directed search: '{search_query[:80]}'")
+
+    refined, success = run_evidence_search(state["query"], [search_query])
+
+    new_context = state.get("final_context", "")
+    if success and refined:
+        new_context = f"{new_context}\n\n## Critic-Requested Evidence\n{refined}"
+
+    print(f"[NODE: EVIDENCE SEARCH] {'Succeeded' if success else 'Failed'} — "
+          f"context now {len(new_context)} chars")
+
+    return {
+        "final_context": new_context,
+        "search_count": state.get("search_count", 0) + 1,
+        "trace": [{
+            "node": "evidence_search",
+            "query": search_query,
+            "found": success,
+            "context_length": len(new_context)
+        }]
+    }
+
+
+# ── Node 7: Revise ────────────────────────────────────────────────────────────
+
+def revise_node(state: AgentState) -> dict:
+    """
+    Rewrites the current response using the critic's structured feedback.
+    Increments thesis_revision_count so route_after_thesis_critique can enforce
+    the MAX_REVISIONS cap and the convergence check in has_converged() fires.
+    """
+    critique = state.get("thesis_critique", {})
+    revision_number = state.get("thesis_revision_count", 0) + 1
+
+    print(f"\n[NODE: REVISE] Revision #{revision_number} — "
+          f"weakest={critique.get('weakest_dimension', 'n/a')}")
+
+    revised = run_generator_revision(
+        query=state["query"],
+        original_response=state.get("response", ""),
+        critique=critique,
+        final_context=state.get("final_context", "")
+    )
+
+    print(f"[NODE: REVISE] Done — {len(revised)} chars")
+
+    return {
+        "response": revised,
+        "thesis_revision_count": revision_number,
+        "trace": [{
+            "node": "revise",
+            "revision_number": revision_number,
+            "response_length": len(revised)
+        }]
+    }
+
+# ── Node 8: Reasoning Reflector ───────────────────────────────────────────────
+
+def reasoning_reflector_node(state: AgentState) -> dict:
     initial = state.get("initial_reasoning_state", {})
     final_critique = state.get("thesis_critique", {})
     revision_count = state.get("thesis_revision_count", 0)
@@ -674,7 +290,13 @@ def reasoning_reflector_node(state: AgentState) -> dict:
     if not initial:
         return {"trace": [{"node": "reasoning_reflector", "status": "no_initial_critique"}]}
 
-    defect_found = (not initial.get("thesis_sound", True)) or bool(initial.get("unsupported_claims")) or bool(initial.get("overconfidence_flags"))
+    defect_found = (
+        (not initial.get("thesis_sound", True))
+        or bool(initial.get("unsupported_claims"))
+        or bool(initial.get("overconfidence_flags"))
+        or bool(initial.get("missing_requirements"))
+        or bool(initial.get("premise_issues"))
+    )
     actually_revised = revision_count > 0
     genuinely_resolved = final_critique.get("thesis_sound", False)
 
@@ -697,7 +319,7 @@ def reasoning_reflector_node(state: AgentState) -> dict:
 
     confidence = compute_reasoning_confidence(
         initial, final_critique,
-        critic_search_used=state.get("critic_search_used", False),
+        critic_search_used=state.get("search_count", 0) > 0,
         revision_count=revision_count
     )
 

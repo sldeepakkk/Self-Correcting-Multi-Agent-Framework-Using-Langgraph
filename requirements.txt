@@ -1,12 +1,20 @@
-langgraph
-langchain-core
-langchain-groq
-langchain-google-genai
-faiss-cpu
-sentence-transformers
-tavily-python
-yfinance
-pydantic
-python-dotenv
-numpy
-matplotlib
+# --- Core Orchestration & Graph ---
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-groq>=0.2.0
+langchain-google-genai>=2.0.0
+
+# --- Retrieval, Embeddings & Vector Store ---
+faiss-cpu>=1.8.0
+sentence-transformers>=3.0.0
+tavily-python>=0.5.0
+yfinance>=0.2.40
+
+# --- Data Validation & Configuration ---
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+numpy>=1.26.0
+
+# --- User Interface & Visualization ---
+streamlit>=1.38.0
+matplotlib>=3.9.0

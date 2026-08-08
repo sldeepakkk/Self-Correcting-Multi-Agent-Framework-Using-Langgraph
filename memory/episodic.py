@@ -82,19 +82,36 @@ def write_reasoning_lesson(query: str, lesson: str, defect_category: str, applie
         return {"active": 0, "status": "DUPLICATE_SKIPPED"}
 
     active = 1 if confidence >= REFLECTION_CONFIDENCE_MIN else 0
+    status = "ACTIVE" if active else "QUARANTINED"
+    timestamp = datetime.utcnow().isoformat()
+
     conn = _get_connection()
     conn.execute(REASONING_SCHEMA)
-    conn.execute(
+    cursor = conn.execute(
         """INSERT INTO reasoning_lessons
            (timestamp, query, lesson, defect_category, applies_to, confidence, active)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (datetime.utcnow().isoformat(), query, lesson, defect_category, applies_to, confidence, active)
+        (timestamp, query, lesson, defect_category, applies_to, confidence, active)
     )
     conn.commit()
+    lesson_id = cursor.lastrowid
     conn.close()
-    status = "ACTIVE" if active else "QUARANTINED"
-    print(f"[REASONING MEMORY] Lesson written — confidence={confidence:.2f} → {status}")
-    return {"active": active, "status": status}
+
+    print(f"[REASONING MEMORY] Lesson #{lesson_id} written — confidence={confidence:.2f} → {status}")
+
+    # Append to human-readable MEMORY_LOG.md
+    _append_memory_log(
+        lesson_id=lesson_id,
+        timestamp=timestamp,
+        query=query,
+        query_category=f"reasoning_{defect_category}",
+        lesson=lesson,
+        confidence=confidence,
+        routing_recommendation=f"applies_to: {applies_to}",
+        status=status
+    )
+
+    return {"id": lesson_id, "active": active, "status": status, "confidence": confidence, "lesson": lesson}
 
 
 def load_reasoning_lessons(limit: int = 8) -> list[str]:
@@ -109,70 +126,6 @@ def load_reasoning_lessons(limit: int = 8) -> list[str]:
     conn.close()
     return [f"[{r['defect_category']}] {r['lesson']}" for r in rows]
 
-# ── Gate 3 — Write with confidence filtering ──────────────────────────────────
-
-def write_lesson(
-    query: str,
-    query_category: str,
-    lesson: str,
-    confidence: float,
-    routing_recommendation: str,
-    run_id: str = None
-) -> dict:
-    """
-    Gate 3 lives here.
-
-    Confidence >= REFLECTION_CONFIDENCE_MIN → active=1 → loaded next run
-    Confidence <  REFLECTION_CONFIDENCE_MIN → active=0 → quarantined
-
-    Quarantined lessons are stored for inspection but never loaded
-    into future system prompts. This prevents low-confidence noise
-    from polluting the policy.
-
-    Returns the written record including active status.
-    """
-
-    # Gate 3
-    active = 1 if confidence >= REFLECTION_CONFIDENCE_MIN else 0
-    status = "ACTIVE" if active else "QUARANTINED"
-
-    timestamp = datetime.utcnow().isoformat()
-
-    conn = _get_connection()
-    cursor = conn.execute(
-        """INSERT INTO lessons
-           (timestamp, query, query_category, lesson, confidence,
-            routing_recommendation, active, run_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (timestamp, query, query_category, lesson, confidence,
-         routing_recommendation, active, run_id)
-    )
-    conn.commit()
-    lesson_id = cursor.lastrowid
-    conn.close()
-
-    print(f"[EPISODIC MEMORY] Lesson #{lesson_id} written — "
-          f"confidence={confidence:.2f} → {status}")
-
-    # Append to human-readable MEMORY_LOG.md
-    _append_memory_log(
-        lesson_id=lesson_id,
-        timestamp=timestamp,
-        query=query,
-        query_category=query_category,
-        lesson=lesson,
-        confidence=confidence,
-        routing_recommendation=routing_recommendation,
-        status=status
-    )
-
-    return {
-        "id": lesson_id,
-        "active": active,
-        "status": status,
-        "confidence": confidence,
-        "lesson": lesson
-    }
 
 
 # ── Load active lessons for planner priors ────────────────────────────────────
@@ -180,12 +133,26 @@ def write_lesson(
 def load_lessons(limit: int = 10) -> list[str]:
     """
     Load active lessons above confidence threshold.
-    Returns list of lesson strings loaded into planner system prompt.
+    Returns list of lesson strings loaded into planner and generator system prompts.
+    Unifies reasoning lessons and general policy lessons.
     Most recent lessons first — recency bias is correct here.
     Only Gate 3-passing lessons (active=1) are returned.
     """
     conn = _get_connection()
-    rows = conn.execute(
+    conn.execute(REASONING_SCHEMA)
+    
+    # 1. Load active reasoning lessons
+    r_rows = conn.execute(
+        """SELECT lesson, defect_category, applies_to, confidence
+           FROM reasoning_lessons
+           WHERE active = 1
+           ORDER BY id DESC
+           LIMIT ?""",
+        (limit,)
+    ).fetchall()
+
+    # 2. Load active general lessons
+    g_rows = conn.execute(
         """SELECT lesson, query_category, routing_recommendation, confidence
            FROM lessons
            WHERE active = 1
@@ -195,44 +162,30 @@ def load_lessons(limit: int = 10) -> list[str]:
     ).fetchall()
     conn.close()
 
-    if not rows:
-        print("[EPISODIC MEMORY] No active lessons found")
-        return []
-
     lessons = []
-    for row in rows:
-        lesson_str = (
-            f"[{row['query_category']} | {row['routing_recommendation']} | "
-            f"confidence={row['confidence']:.2f}] {row['lesson']}"
+    for r in r_rows:
+        lessons.append(
+            f"[{r['defect_category']} | applies_to={r['applies_to']} | "
+            f"confidence={r['confidence']:.2f}] {r['lesson']}"
         )
-        lessons.append(lesson_str)
+    for g in g_rows:
+        lessons.append(
+            f"[{g['query_category']} | {g['routing_recommendation']} | "
+            f"confidence={g['confidence']:.2f}] {g['lesson']}"
+        )
 
-    print(f"[EPISODIC MEMORY] Loaded {len(lessons)} active lessons")
+    lessons = lessons[:limit]
+    if lessons:
+        print(f"[EPISODIC MEMORY] Loaded {len(lessons)} active lessons")
+    else:
+        print("[EPISODIC MEMORY] No active lessons found")
     return lessons
 
 
 # ── Inspection utilities ──────────────────────────────────────────────────────
 
-def get_all_lessons(include_quarantined: bool = False) -> list[dict]:
-    """
-    Returns all lessons. Used for benchmarking and debugging.
-    Set include_quarantined=True to see Gate 3 rejected lessons.
-    """
-    conn = _get_connection()
-    if include_quarantined:
-        rows = conn.execute(
-            "SELECT * FROM lessons ORDER BY id DESC"
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM lessons WHERE active = 1 ORDER BY id DESC"
-        ).fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
-
-
 def get_lesson_count() -> dict:
-    """Returns counts for benchmarking."""
+    """Returns lesson counts. Used by the Streamlit sidebar."""
     conn = _get_connection()
     total = conn.execute("SELECT COUNT(*) FROM lessons").fetchone()[0]
     active = conn.execute(

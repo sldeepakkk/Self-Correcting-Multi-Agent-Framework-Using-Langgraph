@@ -1,148 +1,167 @@
-# from langchain_groq import ChatGroq
+from typing import Any, Mapping, Optional
+import re
 from utils.llm_factory import get_llm
-# from config import GROQ_API_KEY, GENERATOR_MODEL
 from config import GENERATOR_MODEL
 from agents.critic import build_revision_instruction
+
+
+def _extract_query_specifics(query: str) -> list[str]:
+    """
+    Pulls concrete, checkable numeric specifics from the query — dollar
+    amounts, percentages, rupee figures, basis points. These are exactly
+    the things a topically-relevant but generic search result can miss
+    while still scoring high on the aspect judge's topic/factual_density
+    axes. A query naming $50/barrel and 8% appreciation deserves a
+    different confidence level than one asking a general question,
+    even if both retrieve equally "relevant" content.
+    """
+    patterns = [
+        r'\$\d+(?:\.\d+)?',
+        r'\d+(?:\.\d+)?\s*%',
+        r'\d+(?:\.\d+)?\s*percent',
+        r'₹\s*\d+[\d,]*',
+        r'\d+\s*(?:lakh|crore|basis points?|bps)',
+        r'\d+(?:\.\d+)?\s*per\s*barrel',
+    ]
+    specifics = []
+    for p in patterns:
+        specifics.extend(re.findall(p, query, flags=re.IGNORECASE))
+    return specifics
+
+
+def compute_evidence_confidence(state: Mapping[str, Any]) -> str:
+    context = state.get("final_context", "")
+    if not context or len(context.strip()) < 100:
+        return "low"
+
+    query = state.get("query", "")
+    specifics = _extract_query_specifics(query)
+
+    def _is_specific_covered(s: str) -> bool:
+        s_low = s.lower()
+        if s_low in context.lower():
+            return True
+        digits = re.findall(r'\d+', s)
+        if digits and any(d in context for d in digits):
+            return True
+        return False
+
+    covered = (not specifics) or any(_is_specific_covered(s) for s in specifics)
+    has_substance = bool(re.search(r'\d', context)) and any(
+        kw in context.lower() for kw in [
+            '%', 'margin', 'rate', 'profit', 'nim', 'crore', 'lakh', '₹',
+            'price', 'growth', 'quarter', 'bank', 'fy', 'basis', 'bps'
+        ]
+    )
+
+    if len(context) > 500 and (covered or has_substance):
+        return "high"
+    if covered or has_substance or len(context) > 250:
+        return "medium"
+    return "low"
+
 
 def run_generator(
     query: str,
     final_context: str,
-    sub_queries: list[str],
-    missing_info: list[str],
-    premise_correction: str = "",   
-    crag_triggered: bool = False,
-    recovery_succeeded: bool = False,
-    episodic_lessons: list[str] = None
+    sub_queries: Optional[list[str]] = None,
+    premise_correction: str = "",
+    evidence_confidence: str = "medium",
+    episodic_lessons: Optional[list[str]] = None
 ) -> str:
     """
-    Synthesizes the final NSE research report from verified context.
-    
-    Now explicitly anchors the generator's attention to the execution plan 
-    (sub_queries) and corrective feedback (missing_info) to prevent 
-    attention drift and hallucination.
+    No fixed section template. The generator organizes its answer around
+    what the QUESTION actually needs, not a predetermined form. This is
+    the fix for the pattern seen across every benchmark loss: forcing a
+    causal-chain question or a DCF construction into
+    Executive-Summary/Key-Financials/Analyst-View boxes fragmented the
+    argument and left boxes empty even when the underlying reasoning
+    was sound. The rules below are about SUBSTANCE, not FORMAT.
     """
+    episodic_lessons = episodic_lessons or []
+    sub_queries = sub_queries or []
 
-    # ── Redundant Safety Net ──
-    # nodes.py already short-circuits this, but keeping it ensures the 
-    # function contract remains safe if called in isolation.
-    if crag_triggered and not recovery_succeeded:
-        return (
-            "## Research Report — Insufficient Data\n\n"
-            f"**Query:** {query}\n\n"
-            "**Status:** This query requires current information that could not be "
-            "retrieved reliably. Web search did not return financially usable content.\n\n"
-            "**Confidence:** Low — no synthesis attempted to avoid hallucination."
-        )
-
-    # ── Context Source Framing ──
-    if crag_triggered and recovery_succeeded:
-        context_note = (
-            "Note: This report is based on live web search results retrieved via "
-            "CRAG fallback. Sources are current but less structured than proprietary data."
-        )
-    else:
-        context_note = (
-            "Note: This report is based on indexed NSE document context from "
-            "the vector store. Data reflects the most recent seeded documents."
-        )
-
-    # ── Traceability Blocks ──
-    sq_text = "\n".join([f"- {sq}" for sq in sub_queries])
-    
-    retry_text = ""
-    if missing_info:
-        retry_text = "\nTargeted Recovery Dimensions Extracted by Judge:\n" + "\n".join([f"- {mi}" for mi in missing_info])
-
-    lessons_block = ""
-    if episodic_lessons:
-        formatted = "\n".join(f"- {l}" for l in episodic_lessons)
-        lessons_block = f"\nKnown context from previous runs:\n{formatted}\n"
+    confidence_block = ""
+    if evidence_confidence == "low":
+        confidence_block = """
+EVIDENCE CONFIDENCE: LOW. Reason from well-established domain mechanisms
+where retrieved evidence is thin. Explicitly label such reasoning as
+inference ("based on typical mechanism, X would likely...") rather than
+stating it as a confirmed fact. Do not force yourself to report a field
+as empty just because the template used to require it — if you don't
+have a number, work around it in prose rather than leaving a blank line."""
+    elif evidence_confidence == "medium":
+        confidence_block = """
+EVIDENCE CONFIDENCE: MEDIUM. Use retrieved evidence as your primary basis.
+Clearly mark any gaps you fill with general domain reasoning."""
 
     premise_block = ""
     if premise_correction:
         premise_block = f"""
-MANDATORY CORRECTION — a fact-check found an institutional/personnel error
-in the query itself: {premise_correction}
-You MUST state this correction as the first sentence of your Executive
-Summary before proceeding with any analysis. Do not silently proceed as
-if the query's premise were accurate."""
-        
-# ── System Prompt with Domain Guardrails ──
-    system_prompt = f"""You are a senior NSE equity research analyst producing structured research reports.
+MANDATORY CORRECTION — the query itself contains a factual error: {premise_correction}
+State this correction plainly near the start of your answer, then proceed
+with the actual analysis."""
 
-Your job: synthesize the provided context into a clear, structured research report that directly answers the primary query.
+    lessons_block = ""
+    if episodic_lessons:
+        formatted = "\n".join(f"- {l}" for l in episodic_lessons)
+        lessons_block = f"\nPatterns learned from previous runs:\n{formatted}\n"
 
-CRITICAL GUARDRAILS AGAINST HALLUCINATION:
-1. DOMAIN ISOLATION: Do NOT confuse US Federal Reserve (Fed/FOMC) parameters with the Reserve Bank of India (RBI/MPC). The RBI utilizes the Repo Rate. If the context contains US macroeconomic policy text, ignore it entirely.
-2. FINANCIAL SANITY CHECK: Indian banking institutions structurally trade at Price-to-Earnings (PE) multiples between 8x and 30x. If the data block displays thousands (e.g., PE: 1234.70), it is a scraping error—do NOT print it; state "Not available".
-3. CONTEXT GROUNDING: If specific parameters are missing from the context block, do not extrapolate or guess from pre-training. Maintain a clean "Not available" fallback.
+    system_prompt = f"""You are a senior financial analyst writing a research answer.
+
+Write the answer in whatever structure genuinely serves the QUESTION ASKED —
+do not force every answer into the same fixed sections. A causal-chain
+question deserves a chain of reasoning. A valuation construction deserves
+a walk through the model's assumptions and output. A comparison deserves
+a comparison. Use headers where they help the reader, skip them where they
+don't. Write like an analyst answering a specific question, not filling
+out a form.
+
+SUBSTANCE RULES — these apply regardless of structure:
+1. DOMAIN ISOLATION: Do not confuse US Federal Reserve actions/parameters
+   with the Reserve Bank of India, or any other country's institutions
+   with India's, unless the query is specifically about that country.
+2. NUMERICAL SANITY: If a retrieved figure looks like a scraping error
+   (e.g. an Indian bank PE of 1000+), say the data looks unreliable
+   rather than reporting it as fact.
+3. GROUNDING: Never present inference as verified fact. Say what you know
+   versus what you're reasoning through.
+4. SOURCE AUTHORITY: If a specific number (WACC, terminal growth,
+   intrinsic value) comes from a single named individual's blog or forum
+   post rather than a company filing, index provider, or established
+   research desk, attribute it explicitly as one independent estimate —
+   never present it as a verified or consensus figure. Prefer building
+   your own reasonable assumption from stated industry norms over citing
+   an unverified personal calculation.
+5. ANSWER THE ACTUAL QUESTION: If the query asks for a portfolio, name
+   companies and allocations. If it asks to compare two things, compare
+   them directly. Do not retreat into generic macro commentary when the
+   query asked for something specific and concrete.
 {premise_block}
-
-Report structure (always follow this exactly):
-## Executive Summary
-One paragraph. Direct answer to the query based ONLY on the context.
-
-## Key Financials
-Bullet points only. Revenue, PE, margins, 52-week range, market cap.
-If a figure is not in the context, write "Not available in current data".
-
-## Analyst View
-What analysts recommend. Price targets if available. Consensus direction.
-If not in context: "Analyst data not available in current retrieval."
-
-## Macro Context
-Relevant sector or macro factors mentioned in the context.
-If not applicable to the query: omit this section entirely.
-
-## Risk Factors
-2-3 specific risks based on the context.
-
-HYBRID CONTEXT HANDLING:
-If the context contains both "## Web Search Context" and "## Vector Store Context" 
-sections, treat the Vector Store section as your primary source for company-specific 
-figures (revenue, margins, PE, analyst targets) and the Web Search section as your 
-primary source for current macro/policy context (rates, dates, recent events). 
-Do not blend uncertain figures from both sections — cite the more specific source 
-for each individual data point.
-
-FORMAT ADAPTATION:
-If the query is about sectors, macro trends, or market-wide themes rather than
-a specific company, SKIP the "Key Financials" section entirely (do not write
-"Not available" placeholders) and expand "Macro Context" as the primary section
-instead. Only include Key Financials when the query names a specific company
-or companies with reportable financial metrics.
-
-## Verdict
-One sentence. Bullish / Bearish / Neutral with the single strongest reason.
-
+{confidence_block}
 {lessons_block}
-{context_note}"""
+Context available to you (may be partial — reason with what's here, note
+what isn't):
+{final_context}"""
 
-    # ── User Message with Execution Plan Anchoring ──
-    user_message = f"""Primary Query: {query}
+    sub_q_block = ""
+    if sub_queries:
+        formatted_sq = "\n".join(f"- {sq}" for sq in sub_queries)
+        sub_q_block = f"\nSub-questions this breaks down into, for your reference:\n{formatted_sq}\n"
 
-The data retrieval engine broke this query down into the following specific research angles:
-{sq_text}
-{retry_text}
+    user_message = f"""Query: {query}
+{sub_q_block}
+Write the answer."""
 
-Verified Context Block:
-{final_context}
-
-Synthesize the final report addressing the primary query using ONLY the data points relevant to the research angles above."""
-
-    # llm = ChatGroq(
-    #     api_key=GROQ_API_KEY,
-    #     model=GENERATOR_MODEL,
-    #     temperature=0.1 # Lowered from 0.2 to enforce stricter adherence to context
-    # )
     llm = get_llm(GENERATOR_MODEL, temperature=0.2)
-
     response = llm.invoke([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_message}
     ])
+    
+    content = response.content if isinstance(response.content, str) else str(response.content)
+    return content.strip()
 
-    return response.content.strip()
 
 # ---------------------------------------------------------
 # Generator Self-Revision
@@ -151,7 +170,7 @@ Synthesize the final report addressing the primary query using ONLY the data poi
 def run_generator_revision(
     query: str,
     original_response: str,
-    critique: dict,
+    critique: Mapping[str, Any] | dict[str, Any] | Any,
     final_context: str
 ) -> str:
     """
@@ -160,24 +179,30 @@ def run_generator_revision(
     missing_information — except here the feedback targets the ARGUMENT,
     not the search query.
     """
+    if hasattr(critique, "model_dump"):
+        critique_dict = critique.model_dump()
+    elif isinstance(critique, dict):
+        critique_dict = critique
+    else:
+        critique_dict = dict(critique)
+
     issues = []
-    if critique.get("premise_issues"):
-        issues.append("Premise issues in the query: " + "; ".join(critique["premise_issues"]))
-    if critique.get("unsupported_claims"):
-        issues.append("Unsupported claims to remove or hedge: " + "; ".join(critique["unsupported_claims"]))
-    if critique.get("missing_requirements"):
-        issues.append("Missing requirements to address: " + "; ".join(critique["missing_requirements"]))
-    if critique.get("overconfidence_flags"):
-        issues.append("Overconfident verdict to soften: " + "; ".join(critique["overconfidence_flags"]))
+    if critique_dict.get("premise_issues"):
+        issues.append("Premise issues in the query: " + "; ".join(critique_dict["premise_issues"]))
+    if critique_dict.get("unsupported_claims"):
+        issues.append("Unsupported claims to remove or hedge: " + "; ".join(critique_dict["unsupported_claims"]))
+    if critique_dict.get("missing_requirements"):
+        issues.append("Missing requirements to address: " + "; ".join(critique_dict["missing_requirements"]))
+    if critique_dict.get("overconfidence_flags"):
+        issues.append("Overconfident verdict to soften: " + "; ".join(critique_dict["overconfidence_flags"]))
 
     issues_block = "\n".join(f"- {i}" for i in issues) if issues else "- General soundness concern"
     # Boosting-style targeting: prioritize the single worst dimension this round
-    instruction = build_revision_instruction(critique)
-
+    instruction = build_revision_instruction(critique_dict)
 
     system_prompt = f"""You previously wrote a financial research report. A critic
-identified specific issues with your argument. Rewrite the report addressing
-EVERY issue below explicitly. Keep the same six-section structure. If the query
+identified specific issues with your argument. Rewrite the answer addressing EVERY issue below explicitly. 
+Keep whatever structure best serves the question — do not force a fixed template. If the query
 contained a false premise, add an explicit note correcting it before proceeding
 with analysis. If the verdict was overconfident given thin data, soften it and
 explain why. Do not discard real data you already had — only fix the flagged
@@ -207,4 +232,6 @@ Rewrite it, fixing every flagged issue."""
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_message}
     ])
-    return response.content.strip()
+
+    content = response.content if isinstance(response.content, str) else str(response.content)
+    return content.strip()
