@@ -27,40 +27,43 @@ The objective is not simply to generate answers, but to improve the reasoning pr
 ## System Architecture
 
 ```text
-START
-  │
-  ▼
-planner
-  │
-  ▼
-premise_check
-  │
-  ▼
-retriever
-  │
-  ▼
-generator
-  │
-  ▼
-thesis_critic
-  │
-  ├── evidence_search ──┐
-  │                     │
-  │                     ▼
-  │               thesis_critic
-  │
-  ├── revise ───────────┐
-  │                     │
-  │                     ▼
-  │               thesis_critic
-  │
-  └── reasoning_check
-          │
-          ▼
-  reasoning_reflector
-          │
-          ▼
-         END
+┌─────────┐
+│  start  │
+└────┬────┘
+     ▼
+┌─────────┐
+│ planner │
+└────┬────┘
+     ▼
+┌────────────────┐
+│  premise_check │
+└────────┬───────┘
+         ▼
+┌───────────┐
+│ retriever │
+└─────┬─────┘
+      ▼
+┌───────────┐
+│ generator │
+└─────┬─────┘
+      │ solid
+      ▼
+┌─────────────────────┐
+│    thesis_critic     │◀─────────────────────┐
+└──┬────────┬──────┬───┘                       │
+   │dashed  │dashed│dashed "reasoning_check"   │
+   ▼        ▼      ▼                           │
+┌──────┐ ┌───────┐ ┌────────────────────┐      │
+│evid.  │ │revise │ │reasoning_reflector │     │
+│search │ │       │ │                    │     │
+└───┬───┘ └───┬───┘ └─────────┬──────────┘     │
+    │solid    │solid          │solid           │
+    └────┬────┘               ▼                │
+         │                ┌───────┐            │
+         └────────────────│  end  │            │
+                          └───────┘            │
+                               ▲               │
+                               └───────────────┘
 ```
 
 ---
